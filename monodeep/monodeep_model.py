@@ -13,7 +13,8 @@ from collections import namedtuple
 monodeep_parameters = namedtuple('parameters', 
                         'height, width, '
                         'batch_size, '
-                        'num_epochs, '
+                        # 'num_epochs, '
+                        'maxSteps, '                        
                         'dropout, '
                         'full_summary')
 
@@ -170,14 +171,30 @@ class MonoDeepModel(object):
 
         return hidden3[:, :, :, 0]
 
+    # TODO: Terminar
     def build_outputs(self):
         print("terminar")
 
+    # TODO: Mudar
+    def tf_MSE(self, y, y_):
+        # Check if y and y* have the same dimensions
+        assert((y.shape[1] == y_.shape[1]) and (y.shape[2] == y_.shape[2])), "Houston we've got a problem"
+
+        # Variables
+        batchSize, height, width = y_.get_shape().as_list()
+        numPixels = height*width
+        tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
+
+        return tf.reduce_sum(tf.pow(y_ - y, 2))/tf_npixels
+
+    # TODO: Utilizar a tf_mse do stereoCNN e adicionar L2Norm
     def build_losses(self):
         with tf.name_scope("Losses"):
+            self.tf_lossC = self.tf_MSE(self.tf_predCoarse, self.tf_labels)
+            self.tf_lossF = self.tf_MSE(self.tf_predFine, self.tf_labels)
             
 
-
+    # TODO: Terminar
     def build_summaries(self):
         print("terminar")
 

@@ -14,20 +14,21 @@ import argparse
 import tensorflow as tf
 import numpy as np
 import sys
+import matplotlib.pyplot as plt
+
 
 from monodeep_model import *
 from monodeep_dataloader import *
 
 # TODO: Remover
-# import matplotlib.pyplot as plt
 # from scipy import misc as scp
 # from PIL import Image
 # import pstats
 
 
-    # ==================
-    #  Global Variables
-    # ==================
+# ==================
+#  Global Variables
+# ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
@@ -36,7 +37,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 # ===========
 def argumentHandler():
     # Creating Arguments Parser
-    parser = argparse.ArgumentParser(description='Monodeep TensorFlow implementation.')
+    parser = argparse.ArgumentParser("Train the Monodeep Tensorflow implementation taking the dataset.pkl file as input.")
 
     # Input
     parser.add_argument('-m', '--mode',                      type=str,   help='train or test', default='train')
@@ -48,10 +49,12 @@ def argumentHandler():
     parser.add_argument(      '--input_height',              type=int,   help='input height', default=256)
     parser.add_argument(      '--input_width',               type=int,   help='input width', default=512)
     parser.add_argument(      '--batch_size',                type=int,   help='batch size', default=16)
-    parser.add_argument('-e', '--num_epochs',                type=int,   help='number of epochs', default=50)
+    # parser.add_argument('-e', '--num_epochs',                type=int,   help='number of epochs', default=50)
+    parser.add_argument('-e', '--maxSteps',                type=int,   help='number of max Steps', default=1000)
+    
     parser.add_argument('-l', '--learning_rate',             type=float, help='initial learning rate', default=1e-4)
     parser.add_argument('-d', '--dropout',                   type=float,  help="enable dropout in the model during training", default=0.5)
-    parser.add_argument(      '--ldecay',                    type=bool,  help="enable learning decay", default=False) 
+    parser.add_argument(      '--ldecay',                    type=bool,  help="enable learning decay", default=False)
     parser.add_argument('-n', '--l2norm',                    type=bool,  help="Enable L2 Normalization", default=False)
     
     # parser.add_argument(      '--lr_loss_weight',            type=float, help='left-right consistency weight', default=1.0)
@@ -96,9 +99,69 @@ def train(params, args):
         dataloader = MonoDeepDataloader(params, args.mode, args.data_path)
         model = MonoDeepModel(params, args.mode, dataloader.inputSize, dataloader.outputSize)
 
-        
-        # Session
+        with tf.name_scope("Optimizer"):
+                # TODO: Add Learning Decay
+                global_step = tf.Variable(0, trainable=False)  # Count the number of steps taken.
+                learningRate = args.learning_rate
+                optimizer_c = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossC, global_step=global_step)
+                optimizer_f = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossF, global_step=global_step)
 
+    # ========================================
+    #  Network Training Model - Running Graph
+    # ========================================
+    print("[Network/Training] Running built graph...")
+    with tf.Session(graph=graph) as session:
+        tf.global_variables_initializer().run()
+
+        # --------------------- #
+        #  Training/Validation  #
+        # --------------------- #
+        print("[Network/Training] Training Initialized!\n")
+        fig, axes = plt.subplots(4, 1)
+
+        for step in range(args.maxSteps):
+            # Training Batch Preparation
+            offset = (step * args.batch_size) % (dataloader.train_labels.shape[0] - args.batch_size)
+
+            batch_data_colors = dataloader.train_dataset_crop[offset:(offset + args.batch_size), :, :, :]
+            batch_data = dataloader.train_dataset[offset:(offset + args.batch_size), :, :, :]   # (idx, height, width, numChannels)
+            batch_labels = dataloader.train_labels[offset:(offset + args.batch_size), :, :]     # (idx, height, width)
+
+            # ----- Session Run! ----- #
+            # Training
+            feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels, model.tf_keep_prob: args.dropout}
+            _, _, trPredictions_c, trPredictions_f, trLoss_c, trLoss_f = session.run([optimizer_c, optimizer_f, model.tf_predCoarse, model.tf_predFine, model.tf_lossC, model.tf_lossF], feed_dict=feed_dict_train)
+            
+            # Validation
+            feed_dict_valid = {model.tf_image: dataloader.valid_dataset, model.tf_labels: dataloader.valid_labels, model.tf_keep_prob: 1.0}
+            vPredictions_c, vPredictions_f, vLoss_f = session.run([model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid)
+            # -----
+
+            # Prints Training Progress
+            if step % 10 == 0:
+                print('step: %d | Batch trLoss_c: %0.4E | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, trLoss_c, trLoss_f, vLoss_f))
+
+                # fig.clf()
+                axes[0].imshow(batch_data_colors[0,:,:])
+                axes[1].imshow(batch_labels[0,:,:])
+                axes[2].imshow(trPredictions_c[0,:,:])
+                axes[3].imshow(trPredictions_f[0,:,:])
+                
+
+                # plt.figure(1)
+                # plt.imshow(trPredictions_c[0,:,:])
+                # plt.figure(2)
+                # plt.imshow(trPredictions_f[0,:,:])
+                # plt.figure(3)
+                # plt.imshow(batch_data[0,:,:])
+                # plt.figure(4)
+                # plt.imshow(batch_labels[0,:,:])
+                plt.draw()
+                plt.pause(0.001)
+            
+
+        # TODO: Terminar
+        
         # Saver
 
         # Count Params
@@ -120,15 +183,15 @@ def test(params, args):
 # ======
 #  Main
 # ======
-def main(_):
+def main(args):
     print("[App] Running...")
 
-    args = argumentHandler();
     params = monodeep_parameters(
         height=args.input_height,
         width=args.input_width,
         batch_size=args.batch_size,
-        num_epochs=args.num_epochs,
+        # num_epochs=args.num_epochs,
+        maxSteps=args.maxSteps,
         dropout=args.dropout,
         full_summary=args.full_summary)
 
@@ -146,4 +209,5 @@ def main(_):
 #  Main 
 # ======
 if __name__ == '__main__':
-    tf.app.run()
+    args = argumentHandler();
+    tf.app.run(main=main(args))
