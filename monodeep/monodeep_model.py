@@ -10,11 +10,11 @@ from collections import namedtuple
 # ==================
 #  Global Variables
 # ==================
-monodeep_parameters = namedtuple('parameters', 
+monodeep_parameters = namedtuple('parameters',
                         'height, width, '
                         'batch_size, '
                         # 'num_epochs, '
-                        'maxSteps, '                        
+                        'maxSteps, '
                         'dropout, '
                         'full_summary')
 
@@ -22,7 +22,7 @@ monodeep_parameters = namedtuple('parameters',
 #  Class Declaration
 # ===================
 class MonoDeepModel(object):
-    def __init__(self,params, mode, inputSize, outputSize):
+    def __init__(self, params, mode, inputSize, outputSize):
         self.params = params
         self.mode = mode
         self.tf_keep_prob = params.dropout
@@ -38,50 +38,48 @@ class MonoDeepModel(object):
         # print(self.depth_height, self.depth_width)
 
         self.build_model()
-        # self.build_outputs()
+        self.build_outputs()
 
         if self.mode == 'test':
             return
 
         self.build_losses()
-        self.build_summaries()  
+        self.build_summaries()
 
     def build_model(self):
         print("\n[Network] Build Network Model...")
 
         self.createLayers()
-        
+
         with tf.name_scope("Inputs"):
             # TODO: Mudar nomes para tf_image e tf_depth/tf_disp
             self.tf_image = tf.placeholder(tf.float32, shape=(None, self.image_height, self.image_width, self.image_nchannels), name="tf_image")
             self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width), name="tf_labels")
             self.tf_keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+
         
-        with tf.name_scope("Outputs"):
-            self.tf_predCoarse = self.build_modelCoarse(self.tf_image)
-            self.tf_predFine = self.build_modelFine(self.tf_image, self.tf_predCoarse)
 
         # Debug
         # print(self.tf_image)
         # print(self.tf_predCoarse)
         # print(self.tf_predFine)
         # print(self.tf_labels)
-       
 
-    def weight_variable(self, shape, variableName):
+    @staticmethod
+    def weight_variable(shape, variableName):
         initial = tf.truncated_normal(shape, mean=0.00005, stddev=0.0001) # Try to avoid generate negative values
-        # initial = tf.truncated_normal(shape, stddev=10.0)    
+        # initial = tf.truncated_normal(shape, stddev=10.0)
         return tf.Variable(initial, name=variableName)
 
-
-    def bias_variable(self, shape, variableName):
+    @staticmethod
+    def bias_variable(shape, variableName):
         initial = tf.constant(0.1, shape=shape)
         # initial = tf.constant(10.0, shape=shape)
         return tf.Variable(initial, name=variableName)
 
     def createLayers(self):
         print("[Network] Creating Layers...")
-        
+
         # Weights and Biases - Coarse
         self.c_Wh1 = self.weight_variable([11, 11, 3, 96], "c_Wh1")
         self.c_bh1 = self.bias_variable([96], "c_bh1")
@@ -104,7 +102,7 @@ class MonoDeepModel(object):
         self.c_Wh6 = self.weight_variable([Wh5_outputSize_height*Wh5_outputSize_width*256, self.fc_hiddenNeurons], "c_Wh6")
         self.c_bh6 = self.bias_variable([self.fc_hiddenNeurons], "c_bh6")
 
-        self.depth_numPixels = self.depth_height * self.depth_width        
+        self.depth_numPixels = self.depth_height * self.depth_width
         assert (self.fc_hiddenNeurons == self.depth_numPixels), "The number of Neurons must be iqual to the number of output pixels."
 
         self.c_Wh7 = self.weight_variable([self.fc_hiddenNeurons, self.depth_numPixels], "c_Wh7")
@@ -121,35 +119,33 @@ class MonoDeepModel(object):
         self.f_bh3 = self.bias_variable([1], "f_bh3")
 
     def build_modelCoarse(self, image):
-            data_shape = image.get_shape().as_list()
+        # Network Layers
+        conv1 = tf.nn.conv2d(image, filter=self.c_Wh1, strides=[1, 4, 4, 1], padding='SAME')
+        hidden1 = tf.nn.relu(conv1 + self.c_bh1)
+        pool1 = tf.nn.max_pool(hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-            # Network Layers
-            conv1 = tf.nn.conv2d(image, filter=self.c_Wh1, strides=[1, 4, 4, 1], padding='SAME')
-            hidden1 = tf.nn.relu(conv1 + self.c_bh1)
-            pool1 = tf.nn.max_pool(hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        conv2 = tf.nn.conv2d(pool1, filter=self.c_Wh2, strides=[1, 1, 1, 1], padding='SAME')
+        hidden2 = tf.nn.relu(conv2 + self.c_bh2)
+        pool2 = tf.nn.max_pool(hidden2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-            conv2 = tf.nn.conv2d(pool1, filter=self.c_Wh2, strides=[1, 1, 1, 1], padding='SAME')
-            hidden2 = tf.nn.relu(conv2 + self.c_bh2)
-            pool2 = tf.nn.max_pool(hidden2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        conv3 = tf.nn.conv2d(pool2, filter=self.c_Wh3, strides=[1, 1, 1, 1], padding='SAME')
+        hidden3 = tf.nn.relu(conv3 + self.c_bh3)
 
-            conv3 = tf.nn.conv2d(pool2, filter=self.c_Wh3, strides=[1, 1, 1, 1], padding='SAME')
-            hidden3 = tf.nn.relu(conv3 + self.c_bh3)
+        conv4 = tf.nn.conv2d(hidden3, filter=self.c_Wh4, strides=[1, 1, 1, 1], padding='SAME')
+        hidden4 = tf.nn.relu(conv4 + self.c_bh4)
 
-            conv4 = tf.nn.conv2d(hidden3, filter=self.c_Wh4, strides=[1, 1, 1, 1], padding='SAME')
-            hidden4 = tf.nn.relu(conv4 + self.c_bh4)
+        conv5 = tf.nn.conv2d(hidden4, filter=self.c_Wh5, strides=[1, 2, 2, 1], padding='SAME')
+        hidden5 = tf.nn.relu(conv5 + self.c_bh5)
+        shape_h5 = hidden5.get_shape().as_list()
 
-            conv5 = tf.nn.conv2d(hidden4, filter=self.c_Wh5, strides=[1, 2, 2, 1], padding='SAME')
-            hidden5 = tf.nn.relu(conv5 + self.c_bh5)
-            shape_h5 = hidden5.get_shape().as_list()
+        fc1 = tf.reshape(hidden5, [-1, shape_h5[1] * shape_h5[2] * shape_h5[3]])
 
-            fc1 = tf.reshape(hidden5, [-1, shape_h5[1] * shape_h5[2] * shape_h5[3]])
+        hidden6 = tf.nn.relu(tf.matmul(fc1, self.c_Wh6) + self.c_bh6)
+        hidden7 = tf.matmul(tf.nn.dropout(hidden6, self.tf_keep_prob), self.c_Wh7) + self.c_bh7 # Linear
 
-            hidden6 = tf.nn.relu(tf.matmul(fc1, self.c_Wh6) + self.c_bh6)
-            hidden7 = tf.matmul(tf.nn.dropout(hidden6, self.tf_keep_prob), self.c_Wh7) + self.c_bh7 # Linear
+        fc2 = tf.reshape(hidden7, [-1, self.depth_height, self.depth_width])
 
-            fc2 = tf.reshape(hidden7, [-1, self.depth_height, self.depth_width])
-
-            return fc2
+        return fc2
 
     def build_modelFine(self, image, predCoarse):
         image_shape = image.get_shape().as_list()
@@ -171,12 +167,14 @@ class MonoDeepModel(object):
 
         return hidden3[:, :, :, 0]
 
-    # TODO: Terminar
     def build_outputs(self):
-        print("terminar")
+        with tf.name_scope("Outputs"):
+            self.tf_predCoarse = self.build_modelCoarse(self.tf_image)
+            self.tf_predFine = self.build_modelFine(self.tf_image, self.tf_predCoarse)
 
     # TODO: Mudar
-    def tf_MSE(self, y, y_):
+    @staticmethod
+    def tf_MSE(y, y_):
         # Check if y and y* have the same dimensions
         assert((y.shape[1] == y_.shape[1]) and (y.shape[2] == y_.shape[2])), "Houston we've got a problem"
 
@@ -192,14 +190,8 @@ class MonoDeepModel(object):
         with tf.name_scope("Losses"):
             self.tf_lossC = self.tf_MSE(self.tf_predCoarse, self.tf_labels)
             self.tf_lossF = self.tf_MSE(self.tf_predFine, self.tf_labels)
-            
 
-    # TODO: Terminar
+
+    # TODO: Criar summaries das variaveis internas do modelo
     def build_summaries(self):
         print("terminar")
-
-
-
-   
-
-  
