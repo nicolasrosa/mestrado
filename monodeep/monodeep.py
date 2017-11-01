@@ -4,7 +4,7 @@
 # ===========
 #  MonoDeep
 # ===========
-
+# TODO: Adaptar o código para tambem funcionar com o tamanho do nyuDepth
 
 # ===========
 #  Libraries
@@ -15,7 +15,10 @@ import tensorflow as tf
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+import time
+import pprint
 
+from scipy.misc import imshow
 from monodeep_model import *
 from monodeep_dataloader import *
 
@@ -23,7 +26,7 @@ from monodeep_dataloader import *
 #  Global Variables
 # ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 # ===========
 #  Functions
@@ -39,30 +42,25 @@ def argumentHandler():
     # parser.add_argument(      '--dataset',                   type=str,   help='dataset to train on, kitti, or nyuDepth', default='kitti')
     parser.add_argument('-i', '--data_path',                 type=str,   help="set relative path to the dataset <filename>.pkl file", required=True)
     # parser.add_argument(    '--filenames_file',            type=str,   help='path to the filenames text file', required=True)
-    parser.add_argument(      '--input_height',              type=int,   help='input height', default=256)
-    parser.add_argument(      '--input_width',               type=int,   help='input width', default=512)
+    parser.add_argument(      '--input_height',              type=int,   help='input height', default=172)
+    parser.add_argument(      '--input_width',               type=int,   help='input width', default=576)
     parser.add_argument(      '--batch_size',                type=int,   help='batch size', default=16)
     # parser.add_argument('-e', '--num_epochs',                type=int,   help='number of epochs', default=50)
-    parser.add_argument('-e', '--maxSteps',                type=int,   help='number of max Steps', default=1000)
+    parser.add_argument('-e', '--max_steps',                type=int,   help='number of max Steps', default=1000)
     
     parser.add_argument('-l', '--learning_rate',             type=float, help='initial learning rate', default=1e-4)
     parser.add_argument('-d', '--dropout',                   type=float,  help="enable dropout in the model during training", default=0.5)
     parser.add_argument(      '--ldecay',                    type=bool,  help="enable learning decay", default=False)
     parser.add_argument('-n', '--l2norm',                    type=bool,  help="Enable L2 Normalization", default=False)
     
-    # parser.add_argument(      '--lr_loss_weight',            type=float, help='left-right consistency weight', default=1.0)
-    # parser.add_argument(      '--alpha_image_loss',          type=float, help='weight between SSIM and L1 in the image loss', default=0.85)
-    # parser.add_argument(      '--disp_gradient_loss_weight', type=float, help='disparity smoothness weigth', default=0.1)
-    # parser.add_argument(      '--do_stereo',                             help='if set, will train the stereo model', action='store_true')
-    # parser.add_argument(      '--wrap_mode',                 type=str,   help='bilinear sampler wrap mode, edge or border', default='border')
-    # parser.add_argument(      '--use_deconv',                            help='if set, will use transposed convolutions', action='store_true')
-    parser.add_argument(      '--num_gpus',                  type=int,   help='number of GPUs to use for training', default=1)
-    # parser.add_argument(      '--num_threads',               type=int,   help='number of threads to use for data loading', default=8)
-    parser.add_argument('-o', '--output_directory',          type=str,   help='output directory for test disparities, if empty outputs to checkpoint folder', default='')
+    parser.add_argument('-t', '--show_train_progress',action='store_true',  help="Show Training Progress Images", default=False)
+    
+
+
+    parser.add_argument('-o', '--output_directory',          type=str,   help='output directory for test disparities, if empty outputs to checkpoint folder', default='output/')
     parser.add_argument(      '--log_directory',             type=str,   help='directory to save checkpoints and summaries', default='log/')
-    parser.add_argument(      '--checkpoint_path',           type=str,   help='path to a specific checkpoint to load', default='')
     parser.add_argument(      '--restore_path',              type=str,   help='path to a specific restore to load', default='')
-    parser.add_argument(      '--retrain',                               help='if used with checkpoint_path, will restart training from step zero', action='store_true')
+    parser.add_argument(      '--retrain',                               help='if used with restore_path, will restart training from step zero', action='store_true')
     parser.add_argument(      '--full_summary',                          help='if set, will keep more data for each summary. Warning: the file can become very large', action='store_true')
 
     # TODO: Adicionar acima
@@ -78,31 +76,20 @@ def argumentHandler():
 
     return parser.parse_args()
 
-# TODO: Remover
-# def checkFolder(path):
-#     if not os.path.exists(path):
-#         try:
-#             desired_permission = 777
-#             print(path)
-#             input()
-#             print("[App] Creating folder: %s" % path)
-#             os.makedirs(path, desired_permission)
-#         finally:
-#             original_umask = os.umask(0)
-#             os.umask(original_umask)
 
 # ===================== #
 #  Training/Validation  #
 # ===================== #
 def train(params, args):
     print('[App] Selected mode: Train')
+    print('[App] Selected Params: ')
+    print("\t",args)
 
     # -----------------------------------------
     #  Network Training Model - Building Graph
     # -----------------------------------------
-    print("\n[Network] Building Graph...")
-
     graph = tf.Graph()
+
     with graph.as_default():
         # Optimizer
         dataloader = MonoDeepDataloader(params, args.mode, args.data_path)
@@ -110,28 +97,23 @@ def train(params, args):
 
         with tf.name_scope("Optimizer"):
             # TODO: Add Learning Decay
-            global_step = tf.Variable(0, trainable=False)  # Count the number of steps taken.
+            global_step = tf.Variable(0, trainable=False)                                # Count the number of steps taken.
             learningRate = args.learning_rate
             optimizer_c = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossC, global_step=global_step)
             optimizer_f = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossF, global_step=global_step)
 
-        # Summary/Saver Objects
-        saver_folder_path = args.log_directory + args.model_name
-        summary_writer = tf.summary.FileWriter(saver_folder_path)                         # FIXME: Tensorboard files not found, not working properly
-        # train_saver = tf.train.Saver()                                                  # ~4.3 Gb 
-        train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)) # ~850 mb
-
         with tf.name_scope("Summaries"):
+            # Summary/Saver Objects
+            saver_folder_path = args.log_directory + args.model_name
+            summary_writer = tf.summary.FileWriter(saver_folder_path)                         # FIXME: Tensorboard files not found, not working properly
+            # train_saver = tf.train.Saver()                                                  # ~4.3 Gb 
+            train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)) # ~850 mb
+
             tf.summary.scalar('learning_rate', args.learning_rate, ['model_0'])
             tf.summary.scalar('tf_lossC', model.tf_lossC, ['model_0'])
             tf.summary.scalar('tf_lossF', model.tf_lossF, ['model_0'])
             summary_op = tf.summary.merge_all('model_0')
 
-        # Count Params
-        total_num_parameters = 0
-        for variable in tf.trainable_variables():
-            total_num_parameters += np.array(variable.get_shape().as_list()).prod()
-        print("[Network/Training] Number of trainable parameters: {}".format(total_num_parameters))
 
         # Load checkpoint if set
         # TODO: Terminar
@@ -144,16 +126,19 @@ def train(params, args):
     # ----------------------------------------
     #  Network Training Model - Running Graph
     # ----------------------------------------
-    print("[Network/Training] Running built graph...")
+    print("\n[Network/Training] Running built graph...")
     with tf.Session(graph=graph) as session:
         # Init
         print("[Network/Training] Training Initialized!\n")
+        start = time.time()
         tf.global_variables_initializer().run()
-
+        
         fig, axes = plt.subplots(4, 1) # TODO: Mover
 
         """Training Loop"""
-        for step in range(args.maxSteps):
+        for step in range(args.max_steps):
+            start2 = time.time()
+            
             # Training Batch Preparation
             offset = (step * args.batch_size) % (dataloader.train_labels.shape[0] - args.batch_size)      # Pointer
             batch_data_colors = dataloader.train_dataset_crop[offset:(offset + args.batch_size), :, :, :] # (idx, height, width, numChannels) - Raw
@@ -171,23 +156,23 @@ def train(params, args):
             # summary_writer.add_summary(summary_str, global_step=step)
 
             # Prints Training Progress
-            if step % 10 == 0:
-                print('step: %d | Batch trLoss_c: %0.4E | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, trLoss_c, trLoss_f, vLoss_f))
-
-                def plot1():
-                    # fig.clf()
-                    axes[0].imshow(batch_data_colors[0,:,:])
-                    axes[1].imshow(batch_labels[0,:,:])
-                    axes[2].imshow(trPredictions_c[0,:,:])
-                    axes[3].imshow(trPredictions_f[0,:,:])
-                    plt.draw()
-                    # fig.canvas.draw_idle()
+            if step % 10 == 0:                
+                def plot1(raw, label, coarse, fine):
+                    axes[0].imshow(raw)
+                    axes[1].imshow(label)
+                    axes[2].imshow(coarse)
+                    axes[3].imshow(fine)
                     plt.pause(0.001)
-                    # fig.canvas.flush_events()
-                plot1()
 
-        print("\n[Network/Training] Training FINISHED!")
-        # TODO: Print the elapsed time
+                if args.show_train_progress:
+                    plot1(raw=batch_data_colors[0,:,:], label=batch_labels[0,:,:], coarse=trPredictions_c[0,:,:], fine=trPredictions_f[0,:,:])
+
+                end2 = time.time()
+
+                print('step: %d | t: %f |Batch trLoss_c: %0.4E | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, end2-start2,trLoss_c, trLoss_f, vLoss_f))
+
+        end = time.time()
+        print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end-start))
 
         # Saves trained model
         train_saver.save(session, args.log_directory + '/' + args.model_name + '/model') # global_step=last
@@ -198,6 +183,7 @@ def train(params, args):
 # ========= #
 def test(params, args):
     print('[App] Selected mode: Test')
+    print('[App] Selected Params: ', args)
 
     # Load Dataset and Model
     restore_graph = tf.Graph()
@@ -212,38 +198,62 @@ def test(params, args):
         train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
             
         # Restore
-        if args.checkpoint_path == '':
+        if args.restore_path == '':
             restore_path = tf.train.latest_checkpoint(args.log_directory + '/' + args.model_name)
         else:
-            restore_path = args.checkpoint_path.split(".")[0]
+            restore_path = args.restore_path.split(".")[0]
         train_saver.restore(sess_restore, restore_path)
         print('\n[Network/Restore] Restoring model from: %s' % restore_path)
         train_saver.restore(sess_restore, restore_path)
         print("[Network/Restore] Model restored!")
         print("[Network/Restore] Restored variables:\n",tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES),'\n')
        
-
         """Testing Loop"""
         num_test_samples = dataloader.test_dataset.shape[0]
-        for k in range(num_test_samples):
+        test_predFine = np.zeros((num_test_samples, dataloader.outputSize[1], dataloader.outputSize[2]), dtype=np.float32) 
+        for step in range(num_test_samples):
             # Testing Batch Preparation
-            offset = (k * args.batch_size) % (dataloader.test_labels.shape[0] - args.batch_size)    # Pointer
-            batch_data = dataloader.test_dataset[offset:(offset + args.batch_size), :, :, :]        # TODO: (idx, height, width, numChannels) - Raw or Normalized?
-            
-            feed_dict_test = {model.tf_image: batch_data, model.tf_keep_prob: 1.0}
+            feed_dict_test = {model.tf_image: np.expand_dims(dataloader.test_dataset[step],0), model.tf_keep_prob: 1.0} # model.tf_image: (1, height, width, numChannels)
 
             # ----- Session Run! ----- #
-            tPredictions_f = sess_restore.run(model.tf_predFine, feed_dict=feed_dict_test)
+            test_predFine[step] = sess_restore.run(model.tf_predFine, feed_dict=feed_dict_test)
             # -----
 
             # Prints Testing Progress
             # print('k: %d | t: %f' % (k, app.timer2.elapsedTime)) # TODO: ativar
-            print('k: %d/%d | t: %f' % (k+1, num_test_samples,-1))
+            print('step: %d/%d | t: %f' % (step+1, num_test_samples,-1))
         
         # Testing Finished.
         print("\n[Network/Testing] Testing FINISHED!")
 
+        print("[Network/Testing] Saving testing predictions...")
+        if args.output_directory == '':
+            output_directory = os.path.dirname(args.restore_path)
+        else:
+            output_directory = args.output_directory
 
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
+        
+        np.save(output_directory + 'test_disparities.npy', test_predFine)
+
+        # Show Results
+        show_test_disparies = True # TODO: Criar argumento
+        if show_test_disparies:
+            for i,image in enumerate(test_predFine):
+                if i == 0:
+                    plt.figure(1)
+
+                plt.title("test_disparities[%d]" % i)
+                plt.imshow(image)
+                # plt.draw()
+                plt.pause(0.01)
+                # plt.show()
+
+
+
+        # TODO: print save done
+        
     # TODO: Adaptar e remover
         # for k in range(dataloader.test_dataset.shape[0]):
         #     # Testing Batch Preparation
@@ -299,7 +309,7 @@ def main(args):
         width=args.input_width,
         batch_size=args.batch_size,
         # num_epochs=args.num_epochs,
-        maxSteps=args.maxSteps,
+        max_steps=args.max_steps,
         dropout=args.dropout,
         full_summary=args.full_summary)
 

@@ -4,7 +4,9 @@
 # ===========
 #  Libraries
 # ===========
+import numpy as np
 import tensorflow as tf
+
 from collections import namedtuple
 
 # ==================
@@ -14,7 +16,7 @@ monodeep_parameters = namedtuple('parameters',
                         'height, width, '
                         'batch_size, '
                         # 'num_epochs, '
-                        'maxSteps, '
+                        'max_steps, '
                         'dropout, '
                         'full_summary')
 
@@ -46,8 +48,10 @@ class MonoDeepModel(object):
         self.build_losses()
         self.build_summaries()
 
+        self.countParams()
+
     def build_model(self):
-        print("\n[Network] Build Network Model...")
+        print("\n[Network/Model] Build Network Model...")
 
         self.createLayers()
 
@@ -78,7 +82,7 @@ class MonoDeepModel(object):
         return tf.Variable(initial, name=variableName)
 
     def createLayers(self):
-        print("[Network] Creating Layers...")
+        print("[Network/Model] Creating Layers...")
 
         # Weights and Biases - Coarse
         self.c_Wh1 = self.weight_variable([11, 11, 3, 96], "c_Wh1")
@@ -195,3 +199,10 @@ class MonoDeepModel(object):
     # TODO: Criar summaries das variaveis internas do modelo
     def build_summaries(self):
         print("terminar")
+
+    def countParams(self):
+        # Count Params
+        total_num_parameters = 0
+        for variable in tf.trainable_variables():
+            total_num_parameters += np.array(variable.get_shape().as_list()).prod()
+        print("[Network/Model] Number of trainable parameters: {}".format(total_num_parameters))

@@ -24,7 +24,7 @@ class MonoDeepDataloader(object):
         self.showDatasetInfo()
 
     def load(self, filename):
-        print("[Dataset] Loading Dataset...")
+        print("\n[Dataset] Loading Dataset...")
         with open(filename, 'rb') as file:
             data = pickle.load(file)
 
