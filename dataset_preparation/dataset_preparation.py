@@ -31,11 +31,8 @@ np.set_printoptions(threshold=np.nan)
 #  Global Variables
 # ==================
 appName = os.path.splitext(sys.argv[0])[0]
-
 SHOW_FILENAMES_LISTS = True
-
 TRAIN_VALID_RATIO = 0.8  # 80% for Training and 20% for Validation
-
 
 # ===========
 #  Functions
@@ -340,10 +337,10 @@ def createArgsHandler():
 def createDatasetHandler(args):
 
     if(args.dataset[0:5] == 'kitti'): # If the first five letters are equal to 'kitti'
-        # TODO: Tamanhos utilizados para conseguir as raw images 
+        # TODO: Tamanhos utilizados para conseguir as raw images
         imageInputSize = [376, 1241]
         depthInputSize = [376, 1226]
-        
+
         imageOutputSize = [172, 576]
         depthOutputSize = [43, 144]
 
@@ -371,7 +368,7 @@ def createDatasetHandler(args):
         # DATASET_PATH = "/media/nicolas/Documentos/workspace/datasets/nyu-depth-v2/images"
         DATASET_PATH = "/media/olorin/Documentos/datasets/nyu-depth-v2/images"
 
-        # TODO: Tamanhos utilizados para conseguir as raw images 
+        # TODO: Tamanhos utilizados para conseguir as raw images
         imageInputSize = []
         depthInputSize = []
 
@@ -380,7 +377,7 @@ def createDatasetHandler(args):
 
 
     return imageOutputSize, depthOutputSize, DATASET_PATH
-    
+
 
 # ======
 #  Main
@@ -756,10 +753,11 @@ def main():
                 'list_valid_depth_files_filename': list_valid_depth_files_filename,
                 'list_test_colors_files_filename': list_test_colors_files_filename,
                 'list_test_depth_files_filename': list_test_depth_files_filename}
-        pickle.dump(data, pkl_file, pickle.HIGHEST_PROTOCOL)
+
+        pickle.dump(data, pkl_file, pickle.HIGHEST_PROTOCOL) # TODO: DESCOMENTAR!!!
         pkl_file.close()
 
 # ======
-#  Main 
+#  Main
 # ======
 main()

@@ -4,7 +4,7 @@
 # =====================
 #  Dataset Preparation
 # =====================
-# TODO: Verificar se o código ainda funciona para nyu e kittiRaw_<scenes>
+# TODO: Verificar se o código ainda funciona para nyu e kittiraw_<scenes>
 
 # ===========
 #  Libraries
@@ -21,8 +21,8 @@ from scipy import misc as scp
 # ==================
 #  Global Variables
 # ==================
-DATASET_PATH_ROOT = '/media/nicolas/Documentos/workspace/datasets'
-# DATASET_PATH_ROOT = '/media/olorin/Documentos/datasets'
+# DATASET_PATH_ROOT = '/media/nicolas/Documentos/workspace/datasets'
+DATASET_PATH_ROOT = '/media/olorin/Documentos/datasets'
 
 SHOW_IMAGES = False
 KITTI_OCCLUSION = True  # According to Kitti Description, occluded == All Pixels
@@ -162,10 +162,9 @@ def removeUnusedFolders(test_folders, train_folders, datasetObj):
         else:
             unused_train_folders_idx = [1, 2, 3, 4, 5, 7, 8, 9, 10]
 
-    # TODO: Posso remover?
-    # # if datasetObj.name[0:8] == 'kittiRaw':
-    # #     unused_test_folders_idx = []
-    # #     unused_train_folders_idx = []
+    if datasetObj.name[0:8] == 'kittiraw':
+        unused_test_folders_idx = []
+        unused_train_folders_idx = []
 
     test_folders = np.delete(test_folders, unused_test_folders_idx).tolist()
     train_folders = np.delete(train_folders, unused_train_folders_idx).tolist()
@@ -190,11 +189,13 @@ def getListTestFiles(folders, datasetObj):
             colors = colors + glob.glob(os.path.join(datasetObj.path, 'testing', folders[i], '*.png'))
             depth = []
 
-        elif datasetObj.name[0:8] == 'kittiRaw':
+        elif datasetObj.name[0:8] == 'kittiraw':
             if i == 1:
                 colors = colors + glob.glob(os.path.join(datasetObj.path, 'testing', folders[i], '*.png'))
             if i == 0:
                 depth = colors + glob.glob(os.path.join(datasetObj.path, 'testing', folders[0], '*.png'))
+
+            
 
     # Debug
     print("Testing")
@@ -479,8 +480,8 @@ def main():
     train_dataset, train_labels = [], []
 
     # Generates the Network Inputs Images based on the original raw images
-    # if os.path.isfile(False):
-    if os.path.exists('output/' + pkl_filename):
+    if os.path.isfile(False):
+    # if os.path.exists('output/' + pkl_filename):
         print("\n[App]", pkl_filename, 'already exists!')
     else:
         """Testing"""
