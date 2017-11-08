@@ -5,6 +5,8 @@
 #  MonoDeep
 # ===========
 # TODO: Adaptar o código para tambem funcionar com o tamanho do nyuDepth
+# TODO: Adicionar metricas
+# TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
 
 # ===========
 #  Libraries
@@ -45,8 +47,8 @@ def argumentHandler():
     parser.add_argument(      '--input_height',              type=int,   help='input height', default=172)
     parser.add_argument(      '--input_width',               type=int,   help='input width', default=576)
     parser.add_argument(      '--batch_size',                type=int,   help='batch size', default=16)
-    # parser.add_argument('-e', '--num_epochs',                type=int,   help='number of epochs', default=50)
-    parser.add_argument('-e', '--max_steps',                type=int,   help='number of max Steps', default=1000)
+    parser.add_argument('-e', '--num_epochs',                type=int,   help='number of epochs', default=50)
+    parser.add_argument(      '--max_steps',                 type=int,   help='number of max Steps', default=1000)
     
     parser.add_argument('-l', '--learning_rate',             type=float, help='initial learning rate', default=1e-4)
     parser.add_argument('-d', '--dropout',                   type=float,  help="enable dropout in the model during training", default=0.5)
@@ -54,8 +56,6 @@ def argumentHandler():
     parser.add_argument('-n', '--l2norm',                    type=bool,  help="Enable L2 Normalization", default=False)
     
     parser.add_argument('-t', '--show_train_progress',action='store_true',  help="Show Training Progress Images", default=False)
-    
-
 
     parser.add_argument('-o', '--output_directory',          type=str,   help='output directory for test disparities, if empty outputs to checkpoint folder', default='output/')
     parser.add_argument(      '--log_directory',             type=str,   help='directory to save checkpoints and summaries', default='log/')
@@ -136,11 +136,13 @@ def train(params, args):
         fig, axes = plt.subplots(4, 1) # TODO: Mover
 
         """Training Loop"""
+        # TODO: Adicionar loop de epocas
         for step in range(args.max_steps):
             start2 = time.time()
             
             # Training Batch Preparation
             offset = (step * args.batch_size) % (dataloader.train_labels.shape[0] - args.batch_size)      # Pointer
+            # print("offset: %d/%d" % (offset,dataloader.train_labels.shape[0]))
             batch_data_colors = dataloader.train_dataset_crop[offset:(offset + args.batch_size), :, :, :] # (idx, height, width, numChannels) - Raw
             batch_data = dataloader.train_dataset[offset:(offset + args.batch_size), :, :, :]             # (idx, height, width, numChannels) - Normalized
             batch_labels = dataloader.train_labels[offset:(offset + args.batch_size), :, :]               # (idx, height, width)
@@ -240,15 +242,30 @@ def test(params, args):
         # Show Results
         show_test_disparies = True # TODO: Criar argumento
         if show_test_disparies:
-            for i,image in enumerate(test_predFine):
-                if i == 0:
-                    plt.figure(1)
+            fig, axes = plt.subplots(3, 1) # TODO: Mover
 
-                plt.title("test_disparities[%d]" % i)
-                plt.imshow(image)
-                # plt.draw()
-                plt.pause(0.01)
-                # plt.show()
+            for i, image in enumerate(test_predFine):
+                
+                # TODO: Codigo mais rapido
+                # if i == 0:
+                #     plt.figure(1)
+
+                # plt.imshow(image)
+                # plt.imshow(dataloader.test_dataset_crop[i])
+                # # plt.draw()
+                # plt.pause(0.01)
+                # # plt.show()
+
+                # TODO: Codigo temporario
+                def plot2(raw, label, fine):
+                    axes[0].imshow(raw)
+                    axes[1].imshow(label)
+                    axes[2].imshow(fine)
+                    plt.title("test_disparities[%d]" % i)
+
+                    plt.pause(0.001)
+                
+                plot2(dataloader.test_dataset_crop[i],dataloader.test_labels_crop[i],image)
 
 
 
@@ -308,7 +325,7 @@ def main(args):
         height=args.input_height,
         width=args.input_width,
         batch_size=args.batch_size,
-        # num_epochs=args.num_epochs,
+        num_epochs=args.num_epochs,
         max_steps=args.max_steps,
         dropout=args.dropout,
         full_summary=args.full_summary)

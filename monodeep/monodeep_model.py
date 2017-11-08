@@ -15,7 +15,7 @@ from collections import namedtuple
 monodeep_parameters = namedtuple('parameters',
                         'height, width, '
                         'batch_size, '
-                        # 'num_epochs, '
+                        'num_epochs, '
                         'max_steps, '
                         'dropout, '
                         'full_summary')
@@ -189,11 +189,28 @@ class MonoDeepModel(object):
 
         return tf.reduce_sum(tf.pow(y_ - y, 2))/tf_npixels
 
+    @staticmethod
+    def tf_L(y, y_, gamma=0.5):
+        LOSS_LOG_INITIAL_VALUE = 1E-6
+
+        # Variables
+        batchSize, height, width = y_.get_shape().as_list()
+        numPixels = height*width
+
+        # tf_npixels = tf.cast(tf.constant(batchSize*numPixels), tf.float32) # TODO: Posso retirar o tamanho do batch da conta? Lembrando que os tensores foram definidos sem especificar o tamanho do batch, logo nao tenho essa informacao aki.
+        tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
+        tf_d = tf.log(y+LOSS_LOG_INITIAL_VALUE) - tf.log(y_+LOSS_LOG_INITIAL_VALUE)
+
+        return (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)-((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
+
     # TODO: Utilizar a tf_mse do stereoCNN e adicionar L2Norm
     def build_losses(self):
         with tf.name_scope("Losses"):
             self.tf_lossC = self.tf_MSE(self.tf_predCoarse, self.tf_labels)
             self.tf_lossF = self.tf_MSE(self.tf_predFine, self.tf_labels)
+
+            # self.tf_lossC = self.tf_L(self.tf_predCoarse, self.tf_labels)
+            # self.tf_lossF = self.tf_L(self.tf_predFine, self.tf_labels)
 
 
     # TODO: Criar summaries das variaveis internas do modelo

@@ -29,12 +29,12 @@ class MonoDeepDataloader(object):
             data = pickle.load(file)
 
             # Images filenames
-            self.list_train_colors_files_filename = data['list_train_colors_files_filename']
-            self.list_train_depth_files_filename = data['list_train_depth_files_filename']
-            self.list_valid_colors_files_filename = data['list_valid_colors_files_filename']
-            self.list_valid_depth_files_filename = data['list_valid_depth_files_filename']
-            self.list_test_colors_files_filename = data['list_test_colors_files_filename']
-            self.list_test_depth_files_filename = data['list_test_depth_files_filename'] 
+            self.train_files_colors_filename = data['train_colors_files_filename']
+            self.train_files_depth_filename = data['train_depth_files_filename']
+            self.valid_files_colors_filename = data['valid_colors_files_filename']
+            self.valid_files_depth_filename = data['valid_depth_files_filename']
+            self.test_files_colors_filename = data['test_colors_files_filename']
+            self.test_files_depth_filename = data['test_depth_files_filename'] 
 
             # Original Images - Cropped
             self.train_dataset_crop = data['train_dataset_crop']
