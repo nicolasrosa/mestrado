@@ -25,14 +25,26 @@ import time
 import pprint
 
 from scipy.misc import imshow
-from monodeep_model import *
+# from monodeep_model import *
 from monodeep_dataloader import *
+from collections import namedtuple
+
 
 # ==================
 #  Global Variables
 # ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+monodeep_parameters = namedtuple('parameters',
+                        'height, width, '
+                        'batch_size, '
+                        'num_epochs, '
+                        'max_steps, '
+                        'dropout, '
+                        'full_summary')
+
+LOSS_LOG_INITIAL_VALUE = 0.1
 
 # ===========
 #  Functions
@@ -80,6 +92,19 @@ def argumentHandler():
 
     return parser.parse_args()
 
+def weight_variable(shape, variableName):
+    initial = tf.truncated_normal(shape, mean=0.0, stddev=0.01, dtype=tf.float32)         # Recommend by Vitor Guzilini
+    # initial = tf.truncated_normal(shape, mean=0.00005, stddev=0.0001, dtype=tf.float32) # Nick, try to avoid generate negative values
+    # initial = tf.truncated_normal(shape, stddev=10.0)                                   # Test
+    
+    return tf.Variable(initial, name=variableName)
+
+def bias_variable(shape, variableName):
+    initial = tf.constant(0.0, dtype=tf.float32, shape=shape) # Recommend by Vitor Guizilini
+    # initial = tf.constant(0.1, dtype=tf.float32, shape=shape) # Nick
+    # initial = tf.constant(10.0, dtype=tf.float32, shape=shape) # Test
+
+    return tf.Variable(initial, name=variableName)
 
 # ===================== #
 #  Training/Validation  #
@@ -109,10 +134,6 @@ def train(params, args):
 
         print("\n[Network/Model] Build Network ..")
 
-        # Layers
-        coarse = Coarse(image_height, image_width, depth_height, depth_width, fc_hiddenNeurons)
-        fine = Fine()
-
         with tf.name_scope("Inputs"):
             # TODO: Mudar nomes para tf_image e tf_depth/tf_disp
             tf_image = tf.placeholder(tf.float32, shape=(None, image_height, image_width, image_nchannels), name="tf_image")
@@ -122,93 +143,94 @@ def train(params, args):
             tf_log_labels = tf.log(tf_labels + LOSS_LOG_INITIAL_VALUE)
         
         with tf.name_scope("Outputs"):
-            Wh1 = weight_variable([11, 11, 3, 96], "c_Wh1")
-            bh1 = bias_variable([96], "c_bh1")
+            # Weights and Biases - Coarse
+            cWh1 = weight_variable([11, 11, 3, 96], "cWh1")
+            cbh1 = bias_variable([96], "cbh1")
 
-            Wh2 = weight_variable([5, 5, 96, 256], "c_Wh2")
-            bh2 = bias_variable([256], "c_bh2")
+            cWh2 = weight_variable([5, 5, 96, 256], "cWh2")
+            cbh2 = bias_variable([256], "cbh2")
 
-            Wh3 = weight_variable([3, 3, 256, 384], "c_Wh3")
-            bh3 = bias_variable([384], "c_bh3")
+            cWh3 = weight_variable([3, 3, 256, 384], "cWh3")
+            cbh3 = bias_variable([384], "cbh3")
 
-            Wh4 = weight_variable([3, 3, 384, 384], "c_Wh4")
-            bh4 = bias_variable([384], "c_bh4")
+            cWh4 = weight_variable([3, 3, 384, 384], "cWh4")
+            cbh4 = bias_variable([384], "cbh4")
 
-            Wh5 = weight_variable([3, 3, 384, 256], "c_Wh5")
-            bh5 = bias_variable([256], "c_bh5")
+            cWh5 = weight_variable([3, 3, 384, 256], "cWh5")
+            cbh5 = bias_variable([256], "cbh5")
 
             Wh5_outputSize_height = round(image_height/32)+1
             Wh5_outputSize_width = round(image_width/32)
 
-            Wh6 = weight_variable([Wh5_outputSize_height*Wh5_outputSize_width*256, fc_hiddenNeurons], "c_Wh6")
-            bh6 = bias_variable([fc_hiddenNeurons], "c_bh6")
+            cWh6 = weight_variable([Wh5_outputSize_height*Wh5_outputSize_width*256, fc_hiddenNeurons], "cWh6")
+            cbh6 = bias_variable([fc_hiddenNeurons], "cbh6")
 
             depth_numPixels = depth_height * depth_width
             assert (fc_hiddenNeurons == depth_numPixels), "The number of Neurons must be iqual to the number of output pixels."
 
-            Wh7 = weight_variable([fc_hiddenNeurons, depth_numPixels], "c_Wh7")
-            bh7 = bias_variable([depth_numPixels], "c_bh7")
+            cWh7 = weight_variable([fc_hiddenNeurons, depth_numPixels], "cWh7")
+            cbh7 = bias_variable([depth_numPixels], "cbh7")
 
             # Network Layers
-
-            conv1 = tf.nn.conv2d(tf_image, filter=Wh1, strides=[1, 4, 4, 1], padding='SAME')
-            hidden1 = tf.nn.relu(conv1 + bh1)
+            conv1 = tf.nn.conv2d(tf_image, filter=cWh1, strides=[1, 4, 4, 1], padding='SAME')
+            hidden1 = tf.nn.relu(conv1 + cbh1)
             pool1 = tf.nn.max_pool(hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-            conv2 = tf.nn.conv2d(pool1, filter=Wh2, strides=[1, 1, 1, 1], padding='SAME')
-            hidden2 = tf.nn.relu(conv2 + bh2)
+            conv2 = tf.nn.conv2d(pool1, filter=cWh2, strides=[1, 1, 1, 1], padding='SAME')
+            hidden2 = tf.nn.relu(conv2 + cbh2)
             pool2 = tf.nn.max_pool(hidden2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-            conv3 = tf.nn.conv2d(pool2, filter=Wh3, strides=[1, 1, 1, 1], padding='SAME')
-            hidden3 = tf.nn.relu(conv3 + bh3)
+            conv3 = tf.nn.conv2d(pool2, filter=cWh3, strides=[1, 1, 1, 1], padding='SAME')
+            hidden3 = tf.nn.relu(conv3 + cbh3)
 
-            conv4 = tf.nn.conv2d(hidden3, filter=Wh4, strides=[1, 1, 1, 1], padding='SAME')
-            hidden4 = tf.nn.relu(conv4 + bh4)
+            conv4 = tf.nn.conv2d(hidden3, filter=cWh4, strides=[1, 1, 1, 1], padding='SAME')
+            hidden4 = tf.nn.relu(conv4 + cbh4)
 
-            conv5 = tf.nn.conv2d(hidden4, filter=Wh5, strides=[1, 2, 2, 1], padding='SAME')
-            hidden5 = tf.nn.relu(conv5 + bh5)
+            conv5 = tf.nn.conv2d(hidden4, filter=cWh5, strides=[1, 2, 2, 1], padding='SAME')
+            hidden5 = tf.nn.relu(conv5 + cbh5)
             shape_h5 = hidden5.get_shape().as_list()
 
             fc1 = tf.reshape(hidden5, [-1, shape_h5[1] * shape_h5[2] * shape_h5[3]])
 
-            hidden6 = tf.nn.relu(tf.matmul(fc1, Wh6) + bh6)
+            hidden6 = tf.nn.relu(tf.matmul(fc1, cWh6) + cbh6)
 
             # TODO: Remover três linhas abaixo
             hidden7_drop = tf.nn.dropout(hidden6, tf_keep_prob)
-            hidden7_matmul = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), Wh7)
-            hidden7_bias = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), Wh7) + bh7
+            hidden7_matmul = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), cWh7)
+            hidden7_bias = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), cWh7) + cbh7
 
-            hidden7 = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), Wh7) + bh7 # Linear
+            hidden7 = tf.matmul(tf.nn.dropout(hidden6, tf_keep_prob), cWh7) + cbh7 # Linear
 
             fc2 = tf.reshape(hidden7, [-1, depth_height, depth_width])
             tf_predCoarse = fc2
 
-            # Weights and Biases
-            Wh1 = weight_variable([9, 9, 3, 63], "f_Wh1")
-            bh1 = bias_variable([63], "f_bh1")
+            # Weights and Biases - Fine
+            fWh1 = weight_variable([9, 9, 3, 63], "fWh1")
+            fbh1 = bias_variable([63], "fbh1")
 
-            Wh2 = weight_variable([5, 5, 64, 64], "f_Wh2")
-            bh2 = bias_variable([64], "f_bh2")
 
-            Wh3 = weight_variable([5, 5, 64, 1], "f_Wh3")
-            bh3 = bias_variable([1], "f_bh3")
+            fWh2 = weight_variable([5, 5, 64, 64], "fWh2")
+            fbh2 = bias_variable([64], "fbh2")
+
+            fWh3 = weight_variable([5, 5, 64, 1], "fWh3")
+            fbh3 = bias_variable([1], "fbh3")
 
             image_shape = tf_image.get_shape().as_list()
             predCoarse_shape = tf_predCoarse.get_shape().as_list()
 
-            conv1 = tf.nn.conv2d(tf_image, filter=Wh1, strides=[1, 2, 2, 1], padding='SAME')
-            hidden1 = tf.nn.relu(conv1 + bh1)
+            conv1 = tf.nn.conv2d(tf_image, filter=fWh1, strides=[1, 2, 2, 1], padding='SAME')
+            hidden1 = tf.nn.relu(conv1 + fbh1)
             pool1 = tf.nn.max_pool(hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
             int_coarse_dim = tf.expand_dims(tf_predCoarse, 3)
             conc = tf.concat([pool1, int_coarse_dim], axis=3)
 
-            conv2 = tf.nn.conv2d(conc, filter=Wh2, strides=[1, 1, 1, 1], padding='SAME')
-            hidden2 = tf.nn.relu(conv2 + bh2)
+            conv2 = tf.nn.conv2d(conc, filter=fWh2, strides=[1, 1, 1, 1], padding='SAME')
+            hidden2 = tf.nn.relu(conv2 + fbh2)
 
-            conv3 = tf.nn.conv2d(hidden2, filter=Wh3, strides=[1, 1, 1, 1], padding='SAME')
-            # hidden3 = tf.nn.relu(conv3 + bh3) # ReLU
-            hidden3 = conv3 + bh3 # Linear
+            conv3 = tf.nn.conv2d(hidden2, filter=fWh3, strides=[1, 1, 1, 1], padding='SAME')
+            # hidden3 = tf.nn.relu(conv3 + fbh3) # ReLU
+            hidden3 = conv3 + fbh3 # Linear
 
             tf_predFine =  hidden3[:, :, :, 0]
 
@@ -234,29 +256,32 @@ def train(params, args):
 
                 return tf.reduce_sum(tf.pow(y_ - y, 2))/tf_npixels
 
-            def tf_L(y, y_, gamma=0.5):
-                # Local Variables
-                batchSize, height, width = y_.get_shape().as_list()
-                numPixels = height*width
+            # def tf_L(y, y_, gamma=0.5):
+            gamma = 0.5
+            tf_log_y = tf_predFine
+            tf_log_y_ = tf_log_labels
+            # Local Variables
+            batchSize, height, width = tf_log_y_.get_shape().as_list()
+            numPixels = height*width
 
-                # Tensorflow Variables
+            # Tensorflow Variables
 
-                # tf_npixels = tf.cast(tf.constant(batchSize*numPixels), tf.float32) # TODO: Posso retirar o tamanho do batch da conta? Lembrando que os tensores foram definidos sem especificar o tamanho do batch, logo nao tenho essa informacao aki.
-                tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
-                tf_y = y
-                tf_y_ = y_
-                tf_log_y = tf.log(tf_y + LOSS_LOG_INITIAL_VALUE)
-                tf_log_y_ = tf.log(tf_y_ + LOSS_LOG_INITIAL_VALUE)
-                tf_d = tf_log_y - tf_log_y_
+            # tf_npixels = tf.cast(tf.constant(batchSize*numPixels), tf.float32) # TODO: Posso retirar o tamanho do batch da conta? Lembrando que os tensores foram definidos sem especificar o tamanho do batch, logo nao tenho essa informacao aki.
+            tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
+            # tf_y = y
+            # tf_y_ = y_
+            # tf_log_y = tf.log(tf_y + LOSS_LOG_INITIAL_VALUE)
+            # tf_log_y_ = tf.log(tf_y_ + LOSS_LOG_INITIAL_VALUE)
+            tf_d = tf_log_y - tf_log_y_
 
-                tf_loss_d = tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels
-                # tf_loss_d = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)-((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
-                # tf_loss_d = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)-((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
+            tf_loss_d = tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels
+            # tf_loss_d = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)+((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
                 
-                return tf_loss_d
+                # return tf_loss_d
 
-            tf_lossF = tf_MSE(tf_predFine, tf_log_labels)\
+            # tf_lossF = tf_MSE(tf_predFine, tf_log_labels)
             # tf_lossF = tf_L(tf_predFine, tf_log_labels)
+            tf_lossF = tf_loss_d
 
         # build_summaries()
 
@@ -270,6 +295,8 @@ def train(params, args):
             # TODO: Add Learning Decay
             global_step = tf.Variable(0, trainable=False)                                # Count the number of steps taken.
             learningRate = args.learning_rate
+
+            # optimizer_f = tf.train.GradientDescentOptimizer(learningRate).minimize(tf_lossF, global_step=global_step)
             optimizer_f = tf.train.AdamOptimizer(learningRate).minimize(tf_lossF, global_step=global_step)
 
         with tf.name_scope("Summaries"):
@@ -301,6 +328,8 @@ def train(params, args):
         print("[Network/Training] Training Initialized!\n")
         start = time.time()
         tf.global_variables_initializer().run()
+        tf.local_variables_initializer().run()
+
         
         fig, axes = plt.subplots(5, 1) # TODO: Mover
 
@@ -320,14 +349,44 @@ def train(params, args):
             feed_dict_valid = {tf_image: dataloader.valid_dataset, tf_labels: dataloader.valid_labels, tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
+            
+            """Without Optimizer"""
+            # log_labels,trPredictions_c, trPredictions_f, trLoss_f,summary_str = session.run([tf_log_labels, tf_predCoarse, tf_predFine, tf_lossF, summary_op], feed_dict=feed_dict_train) # Training
+            
+            """With Optimizer"""
             _, log_labels,trPredictions_c, trPredictions_f, trLoss_f,summary_str = session.run([optimizer_f, tf_log_labels, tf_predCoarse, tf_predFine, tf_lossF, summary_op], feed_dict=feed_dict_train) # Training
             vPredictions_c, vPredictions_f, vLoss_f = session.run([tf_predCoarse, tf_predFine, tf_lossF], feed_dict=feed_dict_valid) # Validation
             
             # TODO: Remover assim que terminar de arrumar o bug dos NaNs na funcao de custo com log
             # def debug():
-            # conv1, conv2, conv3, conv4, conv5, hidden1, hidden2, hidden3, hidden4, hidden5, hidden6, hidden7, fc1, fc2 = session.run([conv1, conv2, conv3, conv4, conv5, hidden1, hidden2, hidden3, hidden4, hidden5, hidden6, hidden7, fc1, fc2], feed_dict=feed_dict_valid) # Network Evaluation
-            # Wh7, bh7, hidden7_drop,hidden7_matmul, hidden7_bias = session.run([Wh7, bh7, hidden7_drop, hidden7_matmul, hidden7_bias], feed_dict=feed_dict_train) # Training
-            # y, y_, log_y, log_y_, d, loss_d = session.run([tf_y, tf_y_,tf_log_y, tf_log_y_, tf_d,tf_loss_d], feed_dict=feed_dict_valid) # Loss Function Evaluation
+            # conv1, conv2, conv3, conv4, conv5, hidden1, hidden2, hidden3, hidden4, hidden5, hidden6, hidden7, fc1, fc2 = session.run([conv1, conv2, conv3, conv4, conv5, hidden1, hidden2, hidden3, hidden4, hidden5, hidden6, hidden7, fc1, fc2], feed_dict=feed_dict_train) # Network Evaluation
+            rcWh1, rcbh1, rcWh2, rcbh2, rcWh3, rcbh3, rcWh4, rcbh4, rcWh5, rcbh5, rcWh6, rcbh6, rcWh7, rcbh7 = session.run([cWh1, cbh1, cWh2, cbh2, cWh3, cbh3, cWh4, cbh4, cWh5, cbh5, cWh6, cbh6, cWh7, cbh7], feed_dict=feed_dict_train) # Training
+            rfWh1, rfbh1, rfWh2, rfbh2, rfWh3, rfbh3 = session.run([fWh1, fbh1, fWh2, fbh2, fWh3, fbh3], feed_dict=feed_dict_train) # Training
+            # rhidden6, rWh7, rbh7, rhidden7_drop, rhidden7_matmul, rhidden7_bias, rhidden7 = session.run([hidden6, Wh7, bh7, hidden7_drop, hidden7_matmul, hidden7_bias, hidden7], feed_dict=feed_dict_train) # Training
+            log_y, log_y_, d, loss_d = session.run([tf_log_y, tf_log_y_, tf_d,tf_loss_d], feed_dict=feed_dict_train) # Loss Function Evaluation
+
+            # print("cWh1:",rcWh1, '\n', rcWh1.shape, '\n')
+            # print("cbh1:",rcbh1, '\n', rcbh1.shape, '\n')
+            # print("cWh2:",rcWh2, '\n', rcWh2.shape, '\n')
+            # print("cbh2:",rcbh2, '\n', rcbh2.shape, '\n')
+            # print("cWh3:",rcWh3, '\n', rcWh3.shape, '\n')
+            # print("cbh3:",rcbh3, '\n', rcbh3.shape, '\n')
+            # print("cWh4:",rcWh4, '\n', rcWh4.shape, '\n')
+            # print("cbh4:",rcbh4, '\n', rcbh4.shape, '\n')
+            # print("cWh5:",rcWh5, '\n', rcWh5.shape, '\n')
+            # print("cbh5:",rcbh5, '\n', rcbh5.shape, '\n')
+            # print("cWh6:",rcWh6, '\n', rcWh6.shape, '\n')
+            # print("cbh6:",rcbh6, '\n', rcbh6.shape, '\n')
+            # print("cWh7:",rcWh7, '\n', rcWh7.shape, '\n')
+            # print("cbh7:",rcbh7, '\n', rcbh7.shape, '\n')
+
+            # print("fWh1:",rfWh1, '\n', rfWh1.shape, '\n')
+            # print("fbh1:",rfbh1, '\n', rfbh1.shape, '\n')
+            # print("fWh2:",rfWh2, '\n', rfWh2.shape, '\n')
+            # print("fbh2:",rfbh2, '\n', rfbh2.shape, '\n')
+            # print("fWh3:",rfWh3, '\n', rfWh3.shape, '\n')
+            # print("fbh3:",rfbh3, '\n', rfbh3.shape, '\n')
+
 
             # print("conv1:",conv1, '\n', conv1.shape, '\n')
             # print("conv2:",conv2, '\n', conv2.shape, '\n')
@@ -339,25 +398,21 @@ def train(params, args):
             # print("hidden3:",hidden3, '\n', hidden3.shape, '\n')
             # print("hidden4:",hidden4, '\n', hidden4.shape, '\n')
             # print("hidden5:",hidden5, '\n', hidden5.shape, '\n')
-            # print("hidden6:",hidden6, '\n', hidden6.shape, '\n')
-            # print("hidden7_drop:",hidden7_drop, '\n', hidden7_drop.shape, '\n')
-            # print("hidden7_matmul:",hidden7_matmul, '\n', hidden7_matmul.shape, '\n')
-            # print("Wh7:",Wh7, '\n', Wh7.shape, '\n')
-            # print("bh7:",bh7, '\n', bh7.shape, '\n')
-            # print("Wh7:",Wh7.eval(), '\n', Wh7.shape, '\n')
-            # print("bh7:",bh7.eval(), '\n', bh7.shape, '\n')
-            # print("hidden7_bias:",hidden7_bias, '\n', hidden7_bias.shape, '\n')
-            # print("hidden7:",hidden7, '\n', hidden7.shape, '\n')
+            # print("hidden6:",rhidden6, '\n', rhidden6.shape, '\n')
+            # print("hidden7_drop:", rhidden7_drop, '\n', rhidden7_drop.shape, '\n')
+            # print("hidden7_matmul:",rhidden7_matmul, '\n', rhidden7_matmul.shape, '\n')
+            # print("hidden7_bias:",rhidden7_bias, '\n', rhidden7_bias.shape, '\n')
+            # print("hidden7:", rhidden7, '\n', rhidden7.shape, '\n')
             # print("fc1:",fc1, '\n', fc2.shape, '\n')
             # print("fc2:",fc2, '\n', fc2.shape, '\n')
 
-            # # print("y:",y, '\n', y.shape, '\n')
-            # # print("y_:",y_, '\n', y_.shape, '\n')
-            # # print("log_y:",log_y, '\n', log_y.shape,'\n')
-            # # print("log_y_:",log_y_, '\n', log_y_.shape, '\n')
-            # # print("d:",d, '\n', d.shape, '\n')
-            # # print("loss_d:",loss_d, '\n', loss_d.shape, '\n')
-            # # print('\n',np.isnan(y).any(), np.isnan(y_).any(), np.isnan(log_y).any(),np.isnan(log_y_).any(),np.isnan(d).any(), np.isnan(loss_d).any())
+            # print("y:",y, '\n', y.shape, '\n')
+            # print("y_:",y_, '\n', y_.shape, '\n')
+            # print("log_y:",log_y, '\n', log_y.shape,'\n')
+            # print("log_y_:",log_y_, '\n', log_y_.shape, '\n')
+            # print("d:",d, '\n', d.shape, '\n')
+            # print("loss_d:",loss_d, '\n', loss_d.shape, '\n')
+            # print('\n',np.isnan(y).any(), np.isnan(y_).any(), np.isnan(log_y).any(),np.isnan(log_y_).any(),np.isnan(d).any(), np.isnan(loss_d).any())
             # input()
 
             # debug()

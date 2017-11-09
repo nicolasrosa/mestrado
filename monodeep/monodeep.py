@@ -4,9 +4,13 @@
 # ===========
 #  MonoDeep
 # ===========
+# This Coarse-to-Fine Network Architecture predicts the log depth (log y).
+
 # TODO: Adaptar o código para tambem funcionar com o tamanho do nyuDepth
 # TODO: Adicionar metricas
 # TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
+# FIXME: Arrumar dataset_preparation.py, kitti2012.pkl nao possui imagens de teste
+# FIXME: Apos uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
 
 # ===========
 #  Libraries
@@ -89,7 +93,6 @@ def train(params, args):
     #  Network Training Model - Building Graph
     # -----------------------------------------
     graph = tf.Graph()
-
     with graph.as_default():
         # Optimizer
         dataloader = MonoDeepDataloader(params, args.mode, args.data_path)
@@ -99,7 +102,6 @@ def train(params, args):
             # TODO: Add Learning Decay
             global_step = tf.Variable(0, trainable=False)                                # Count the number of steps taken.
             learningRate = args.learning_rate
-            optimizer_c = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossC, global_step=global_step)
             optimizer_f = tf.train.AdamOptimizer(learningRate).minimize(model.tf_lossF, global_step=global_step)
 
         with tf.name_scope("Summaries"):
@@ -110,7 +112,6 @@ def train(params, args):
             train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)) # ~850 mb
 
             tf.summary.scalar('learning_rate', args.learning_rate, ['model_0'])
-            tf.summary.scalar('tf_lossC', model.tf_lossC, ['model_0'])
             tf.summary.scalar('tf_lossF', model.tf_lossF, ['model_0'])
             summary_op = tf.summary.merge_all('model_0')
 
@@ -133,7 +134,7 @@ def train(params, args):
         start = time.time()
         tf.global_variables_initializer().run()
         
-        fig, axes = plt.subplots(4, 1) # TODO: Mover
+        fig, axes = plt.subplots(5, 1) # TODO: Mover
 
         """Training Loop"""
         # TODO: Adicionar loop de epocas
@@ -151,7 +152,7 @@ def train(params, args):
             feed_dict_valid = {model.tf_image: dataloader.valid_dataset, model.tf_labels: dataloader.valid_labels, model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
-            _, _, trPredictions_c, trPredictions_f, trLoss_c, trLoss_f,summary_str = session.run([optimizer_c, optimizer_f, model.tf_predCoarse, model.tf_predFine, model.tf_lossC, model.tf_lossF, summary_op], feed_dict=feed_dict_train) # Training
+            _, log_labels,trPredictions_c, trPredictions_f, trLoss_f,summary_str = session.run([optimizer_f, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF, summary_op], feed_dict=feed_dict_train) # Training
             vPredictions_c, vPredictions_f, vLoss_f = session.run([model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid) # Validation
             # -----
 
@@ -159,19 +160,20 @@ def train(params, args):
 
             # Prints Training Progress
             if step % 10 == 0:                
-                def plot1(raw, label, coarse, fine):
+                def plot1(raw, label, log_label, coarse, fine):
                     axes[0].imshow(raw)
                     axes[1].imshow(label)
-                    axes[2].imshow(coarse)
-                    axes[3].imshow(fine)
+                    axes[2].imshow(log_label)
+                    axes[3].imshow(coarse)
+                    axes[4].imshow(fine)
                     plt.pause(0.001)
 
                 if args.show_train_progress:
-                    plot1(raw=batch_data_colors[0,:,:], label=batch_labels[0,:,:], coarse=trPredictions_c[0,:,:], fine=trPredictions_f[0,:,:])
+                    plot1(raw=batch_data_colors[0,:,:], label=batch_labels[0,:,:], log_label=log_labels[0,:,:],coarse=trPredictions_c[0,:,:], fine=trPredictions_f[0,:,:])
 
                 end2 = time.time()
 
-                print('step: %d | t: %f |Batch trLoss_c: %0.4E | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, end2-start2,trLoss_c, trLoss_f, vLoss_f))
+                print('step: %d/%d | t: %f | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, args.max_steps, end2-start2, trLoss_f, vLoss_f))
 
         end = time.time()
         print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end-start))
@@ -346,3 +348,4 @@ def main(args):
 if __name__ == '__main__':
     args = argumentHandler();
     tf.app.run(main=main(args))
+
