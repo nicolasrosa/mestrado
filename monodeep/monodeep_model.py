@@ -39,6 +39,24 @@ def bias_variable(shape, variableName):
 
     return tf.Variable(initial, name=variableName)
 
+def gradient_x(img):
+    gx = img[:,:,:-1] - img[:,:,1:]
+
+    # Debug
+    # print("img:", img.shape)
+    # print("gx:",gx.shape)
+    
+    return gx
+
+def gradient_y(img):
+    gy = img[:,:-1,:] - img[:,1:,:]
+
+    # Debug
+    # print("img:", img.shape)
+    # print("gy:",gy.shape)
+
+    return gy
+
 # ===================
 #  Class Declaration
 # ===================
@@ -252,8 +270,15 @@ class MonoDeepModel(object):
         tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
         tf_d = tf_log_y - tf_log_y_
 
-        tf_loss_d = tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels
-        # tf_loss_d = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)-((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
+        tf_gx_d = gradient_x(tf_d)
+        tf_gy_d = gradient_y(tf_d)
+
+        mean_term = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)
+        variance_term = ((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
+        grads_term = (tf.reduce_sum(tf.pow(tf_gx_d,2))+tf.reduce_sum(tf.pow(tf_gy_d,2)))/tf_npixels
+
+        #FIXME: variance_term should be negative
+        tf_loss_d = mean_term+variance_term+grads_term
         
         return tf_loss_d
 
@@ -274,4 +299,5 @@ class MonoDeepModel(object):
         for variable in tf.trainable_variables():
             total_num_parameters += np.array(variable.get_shape().as_list()).prod()
         print("[Network/Model] Number of trainable parameters: {}".format(total_num_parameters))
+
 
