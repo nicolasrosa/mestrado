@@ -10,6 +10,10 @@
 # TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
 # TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
 # FIXME: Arrumar dataset_preparation.py, kitti2012.pkl nao possui imagens de teste
+<<<<<<< HEAD
+=======
+# FIXME: Apos uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
+>>>>>>> e7a9bfb3e4a771c6686cb0bd8aaa7408c37db33d
 
 # ===========
 #  Libraries
@@ -141,6 +145,11 @@ def train(params, args):
         print("[Network/Training] Training Initialized!\n")
         start = time.time()
         tf.global_variables_initializer().run()
+<<<<<<< HEAD
+=======
+        
+        fig, axes = plt.subplots(5, 1) # TODO: Mover
+>>>>>>> e7a9bfb3e4a771c6686cb0bd8aaa7408c37db33d
 
         # TODO: Mover
         fig, axes = plt.subplots(5, 1)
@@ -172,23 +181,35 @@ def train(params, args):
                                model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
+<<<<<<< HEAD
             _, log_labels, trPredictions_c, trPredictions_f, trLoss_f, summary_str = session.run(
                 [optimizer_f, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF, summary_op],
                 feed_dict=feed_dict_train)  # Training
             vPredictions_c, vPredictions_f, vLoss_f = session.run(
                 [model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid)  # Validation
             # ------------------------ #
+=======
+            _, log_labels,trPredictions_c, trPredictions_f, trLoss_f,summary_str = session.run([optimizer_f, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF, summary_op], feed_dict=feed_dict_train) # Training
+            vPredictions_c, vPredictions_f, vLoss_f = session.run([model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid) # Validation
+            # -----
+>>>>>>> e7a9bfb3e4a771c6686cb0bd8aaa7408c37db33d
 
             # summary_writer.add_summary(summary_str, global_step=step)
 
             # Prints Training Progress
+<<<<<<< HEAD
             if step % 10 == 0:
                 def plot1(raw, label, log_label, coarse, fine):
                     
 
+=======
+            if step % 10 == 0:                
+                def plot1(raw, label, log_label, coarse, fine):
+>>>>>>> e7a9bfb3e4a771c6686cb0bd8aaa7408c37db33d
                     axes[0].imshow(raw)
                     axes[0].set_title("Raw")
                     axes[1].imshow(label)
+<<<<<<< HEAD
                     axes[1].set_title("Label")
                     axes[2].imshow(log_label)
                     axes[2].set_title("log(Label)")
@@ -208,6 +229,19 @@ def train(params, args):
 
                 print('step: %d/%d | t: %f | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (
                 step, args.max_steps, end2 - start2, trLoss_f, vLoss_f))
+=======
+                    axes[2].imshow(log_label)
+                    axes[3].imshow(coarse)
+                    axes[4].imshow(fine)
+                    plt.pause(0.001)
+
+                if args.show_train_progress:
+                    plot1(raw=batch_data_colors[0,:,:], label=batch_labels[0,:,:], log_label=log_labels[0,:,:],coarse=trPredictions_c[0,:,:], fine=trPredictions_f[0,:,:])
+
+                end2 = time.time()
+
+                print('step: %d/%d | t: %f | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (step, args.max_steps, end2-start2, trLoss_f, vLoss_f))
+>>>>>>> e7a9bfb3e4a771c6686cb0bd8aaa7408c37db33d
 
         end = time.time()
         print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end - start))
