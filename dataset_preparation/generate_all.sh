@@ -1,6 +1,7 @@
 python3 dataset_preparation.py -s kitti2012
 python3 dataset_preparation.py -s kitti2015
-python3 dataset_preparation.py -s kittiRaw_campus
-python3 dataset_preparation.py -s kittiRaw_city
-python3 dataset_preparation.py -s kittiRaw_road
-python3 dataset_preparation.py -s nyuDepth
+python3 dataset_preparation.py -s kittiraw_campus
+python3 dataset_preparation.py -s kittiraw_city
+python3 dataset_preparation.py -s kittiraw_road
+python3 dataset_preparation.py -s nyudepth
+# python3 dataset_preparation.py -s kittiraw_residential_continuous

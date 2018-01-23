@@ -4,7 +4,7 @@
 # =====================
 #  Dataset Preparation
 # =====================
-# TODO: Arrumar o bug de MemoryError que aconteceu para o kittiRaw_residential 
+# TODO: Arrumar o bug de MemoryError que aconteceu para o kittiraw_residential 
 
 # ===========
 #  Libraries
@@ -302,7 +302,7 @@ def checkArgumentsIntegrity(args):
     print(args)
 
     try:
-        if args.dataset != 'nyuDepth' and args.dataset[0:5] != 'kitti' :
+        if args.dataset != 'nyudepth' and args.dataset[0:5] != 'kitti' :
             raise ValueError
 
         return False
@@ -310,7 +310,7 @@ def checkArgumentsIntegrity(args):
         print(e)
         print("ValueError: '", args.dataset,
               "' is not a valid name! Please select one of the following datasets: 'kitti2012', "
-              "'kitti2015' or 'nyuDepth'", sep='')
+              "'kitti2015' or 'nyudepth'", sep='')
         print("e.g: python3 ", os.path.splitext(sys.argv[0])[0], ".py -s kitti2012", sep='')
         return True
 
@@ -318,7 +318,7 @@ def checkArgumentsIntegrity(args):
 def createArgsHandler():
     parser = argparse.ArgumentParser("Dumps datasets images into a dataset.pickle file.")
     parser.add_argument('-s', '--dataset', action='store', dest='dataset',
-                        help="Selects the dataset ['kitti2012','kitti2015','nyuDepth',kittiRaw]")
+                        help="Selects the dataset ['kitti2012','kitti2015','nyudepth',kittiraw]")
     parser.add_argument('-i', '--showImageRGB', action="store_true", dest="showImageRGB",
                         help="Plots the Colored Input Images ", default=False)
     parser.add_argument('-d', '--showImageDepth', action="store_true", dest="showImageDepth",
@@ -352,19 +352,22 @@ def createDatasetHandler(args):
             # DATASET_PATH = "/media/nicolas/Documentos/workspace/datasets/kitti/data_scene_flow"
             DATASET_PATH = "/media/olorin/Documentos/datasets/kitti/data_scene_flow"
 
-        elif args.dataset == 'kittiRaw_city':
+        elif args.dataset == 'kittiraw_city':
             DATASET_PATH = "/media/olorin/Documentos/datasets/nicolas_kitti/dataset1/city/2011_09_29_drive_0071"
 
-        elif args.dataset == 'kittiRaw_road':
+        elif args.dataset == 'kittiraw_road':
             DATASET_PATH = "/media/olorin/Documentos/datasets/nicolas_kitti/dataset1/road/2011_10_03_drive_0042"
 
-        elif args.dataset == 'kittiRaw_residential':
+        elif args.dataset == 'kittiraw_residential':
             DATASET_PATH = "/media/olorin/Documentos/datasets/nicolas_kitti/dataset1/residential/2011_09_30_drive_0028"
 
-        elif args.dataset == 'kittiRaw_campus':
+        elif args.dataset == 'kittiraw_campus':
             DATASET_PATH = "/media/olorin/Documentos/datasets/nicolas_kitti/dataset1/campus/2011_09_28_drive_0039"
+        
+        elif args.dataset == 'kittiraw_residential_continuous':
+            DATASET_PATH = "/media/olorin/Documentos/datasets/nicolas_kitti/dataset1/residential_continuous"
 
-    elif args.dataset == 'nyuDepth':
+    elif args.dataset == 'nyudepth':
         # DATASET_PATH = "/media/nicolas/Documentos/workspace/datasets/nyu-depth-v2/images"
         DATASET_PATH = "/media/olorin/Documentos/datasets/nyu-depth-v2/images"
 
@@ -427,7 +430,7 @@ def main():
             unused_test_folders_idx = []
             unused_train_folders_idx = [0, 1, 4, 5, 8, 9, 10]
 
-        if args.dataset[0:8] == 'kittiRaw':
+        if args.dataset[0:8] == 'kittiraw':
             unused_test_folders_idx = []
             unused_train_folders_idx = []
 
@@ -449,7 +452,7 @@ def main():
     list_train_depth_files_path = []
 
     for i in range(0, len(list_test_folders)):
-        if args.dataset == 'nyuDepth':
+        if args.dataset == 'nyudepth':
             list_test_colors_files_path = glob.glob(os.path.join(DATASET_PATH, 'testing', list_test_folders[i],'*_colors.png')) + list_test_colors_files_path
             list_test_depth_files_path = glob.glob(os.path.join(DATASET_PATH, 'testing', list_test_folders[i], '*_depth.png')) + list_test_depth_files_path
         
@@ -457,7 +460,7 @@ def main():
             list_test_colors_files_path = glob.glob(os.path.join(DATASET_PATH, 'testing', list_test_folders[i], '*.png')) + list_test_colors_files_path
             list_test_depth_files_path = []
 
-        elif args.dataset[0:8] == 'kittiRaw':
+        elif args.dataset[0:8] == 'kittiraw':
             if i==1:
                 list_test_colors_files_path = glob.glob(os.path.join(DATASET_PATH, 'testing', list_test_folders[i], '*.png')) + list_test_colors_files_path
             if i==0:
@@ -473,7 +476,7 @@ def main():
     # input("Press")
 
     for i in range(0, len(list_train_folders)):
-        if args.dataset == 'nyuDepth':
+        if args.dataset == 'nyudepth':
             list_train_colors_files_path = glob.glob(os.path.join(DATASET_PATH, 'training', list_train_folders[i],'*_colors.png')) + list_train_colors_files_path
             list_train_depth_files_path = glob.glob(os.path.join(DATASET_PATH, 'training', list_train_folders[i],'*_depth.png')) + list_train_depth_files_path
 
@@ -489,7 +492,7 @@ def main():
             if i == 0 or i == 1:
                 list_train_depth_files_path = glob.glob(os.path.join(DATASET_PATH, 'training', list_train_folders[i],'*.png')) + list_train_depth_files_path
 
-        elif args.dataset[0:8] == 'kittiRaw':
+        elif args.dataset[0:8] == 'kittiraw':
             if i == 1:
                 list_train_colors_files_path = glob.glob(os.path.join(DATASET_PATH, 'training', list_train_folders[i],'*.png')) + list_train_colors_files_path
             if i == 0:
@@ -542,7 +545,7 @@ def main():
 
     print("Checking if all '*_colors.png' files have its correspondent '*_depth.png file'...")
     # TODO: Unificar esse trecho
-    if args.dataset == 'nyuDepth':
+    if args.dataset == 'nyudepth':
         for i in range(0, len(list_test_colors_files_path)):
             test_valid_pair_files.append(list_test_depth_files_path[i] in list_test_depth_files_path)
             # test_valid_pair_files.append(list_test_files_colors[i] in list_test_files_depth)
@@ -595,7 +598,7 @@ def main():
     trainSize = round(len(idx) * TRAIN_VALID_RATIO)
     validSize = len(idx) - trainSize
     
-    if args.dataset == 'nyuDepth':
+    if args.dataset == 'nyudepth':
         testSize = len(idx2)
     elif args.dataset == 'kitti2012' or 'kitti2015':
         testSize = len(list_test_colors_files_path) # Doesn't have Depth Images

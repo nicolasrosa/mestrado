@@ -4,3 +4,4 @@ python3 dataset_preparation2.py -s kittiraw_campus
 python3 dataset_preparation2.py -s kittiraw_city
 python3 dataset_preparation2.py -s kittiraw_road
 python3 dataset_preparation2.py -s nyudepth
+# python3 dataset_preparation2.py -s kittiraw_residential_continuous

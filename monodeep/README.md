@@ -1,4 +1,4 @@
-# stereoCNN
+# Monodeep
 In development...
 
 # Kitti Dataset
@@ -13,6 +13,13 @@ Most Indicated scenes list (without static scenes):
 **Campus**: Only 0038, 0045, 0047
 
 **Person**: n/a
+
+# Training
+Ex: ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t
+    ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_residential_continuous.pkl --max_steps 300 -t
+
+# Testing
+Ex: ./monodeep.py -m test -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t
 
 # Dataset Prepation Script
 

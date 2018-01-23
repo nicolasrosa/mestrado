@@ -78,3 +78,4 @@ class MonoDeepDataloader(object):
     def getImageNumChannels(self):
         numChannels = self.train_dataset.shape[3]
         return numChannels
+

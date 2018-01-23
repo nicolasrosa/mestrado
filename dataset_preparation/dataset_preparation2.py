@@ -96,8 +96,7 @@ def checkArgumentsIntegrity(args):
         print(e)
         print("[Error] ValueError: '", args.dataset,
               "' is not a valid name! Please select one of the following datasets: "
-              "'kitti<dataset_identification>' or 'nyudepth'",
-              sep='')
+              "'kitti<dataset_identification>' or 'nyudepth'", sep='')
         print("e.g: python3 ", os.path.splitext(sys.argv[0])[0], ".py -s kitti2012", sep='')
         raise SystemExit
 
@@ -123,7 +122,12 @@ def selectedDataset(args):
 
         elif args.dataset == 'kittiraw_campus':
             dataset_path = DATASET_PATH_ROOT + '/nicolas_kitti/dataset1/campus/2011_09_28_drive_0039'
+            
+        elif args.dataset == 'kittiraw_residential_continuous':
+            dataset_path = DATASET_PATH_ROOT + '/nicolas_kitti/dataset1/residential_continuous'
 
+        # print(dataset_path)
+        # input()
         kitti = datasetKitti(args, dataset_path)
 
         return kitti, dataset_path
