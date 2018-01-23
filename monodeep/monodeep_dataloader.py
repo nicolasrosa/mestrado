@@ -9,9 +9,9 @@ from six.moves import cPickle as pickle
 #  Class Declaration
 # ===================
 class MonoDeepDataloader(object):
-    def __init__(self, params, mode, data_path):
+    def __init__(self, args, params, data_path):
         self.params = params
-        self.mode = mode
+        self.mode = args.mode
         self.data_path = data_path
         self.inputSize = -1
         self.outputSize = -1

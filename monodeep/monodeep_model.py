@@ -12,50 +12,56 @@ from collections import namedtuple
 # ==================
 #  Global Variables
 # ==================
-monodeep_parameters = namedtuple('parameters',
-                        'height, width, '
-                        'batch_size, '
-                        'num_epochs, '
-                        'max_steps, '
-                        'dropout, '
-                        'full_summary')
+# TODO: Remover
+# monodeep_parameters = namedtuple('parameters',
+#                         'height, width, '
+#                         'batch_size, '
+#                         'num_epochs, '
+#                         'max_steps, '
+#                         'dropout, '
+#                         'full_summary')
 
 LOSS_LOG_INITIAL_VALUE = 0.1
+
 
 # ===========
 #  Functions
 # ===========
 def weight_variable(shape, variableName):
-    initial = tf.truncated_normal(shape, mean=0.0, stddev=0.01, dtype=tf.float32)         # Recommend by Vitor Guzilini
+    initial = tf.truncated_normal(shape, mean=0.0, stddev=0.01, dtype=tf.float32)  # Recommend by Vitor Guzilini
     # initial = tf.truncated_normal(shape, mean=0.00005, stddev=0.0001, dtype=tf.float32) # Nick, try to avoid generate negative values
     # initial = tf.truncated_normal(shape, stddev=10.0)                                   # Test
-    
+
     return tf.Variable(initial, name=variableName)
 
+
 def bias_variable(shape, variableName):
-    initial = tf.constant(0.0, dtype=tf.float32, shape=shape) # Recommend by Vitor Guizilini
+    initial = tf.constant(0.0, dtype=tf.float32, shape=shape)  # Recommend by Vitor Guizilini
     # initial = tf.constant(0.1, dtype=tf.float32, shape=shape) # Nick
     # initial = tf.constant(10.0, dtype=tf.float32, shape=shape) # Test
 
     return tf.Variable(initial, name=variableName)
 
+
 def gradient_x(img):
-    gx = img[:,:,:-1] - img[:,:,1:]
+    gx = img[:, :, :-1] - img[:, :, 1:]
 
     # Debug
     # print("img:", img.shape)
     # print("gx:",gx.shape)
-    
+
     return gx
 
+
 def gradient_y(img):
-    gy = img[:,:-1,:] - img[:,1:,:]
+    gy = img[:, :-1, :] - img[:, 1:, :]
 
     # Debug
     # print("img:", img.shape)
     # print("gy:",gy.shape)
 
     return gy
+
 
 # ===================
 #  Class Declaration
@@ -78,14 +84,15 @@ class Coarse(object):
         self.Wh5 = weight_variable([3, 3, 384, 256], "c_Wh5")
         self.bh5 = bias_variable([256], "c_bh5")
 
-        Wh5_outputSize_height = round(image_height/32)+1
-        Wh5_outputSize_width = round(image_width/32)
+        Wh5_outputSize_height = round(image_height / 32) + 1
+        Wh5_outputSize_width = round(image_width / 32)
 
-        self.Wh6 = weight_variable([Wh5_outputSize_height*Wh5_outputSize_width*256, fc_hiddenNeurons], "c_Wh6")
+        self.Wh6 = weight_variable([Wh5_outputSize_height * Wh5_outputSize_width * 256, fc_hiddenNeurons], "c_Wh6")
         self.bh6 = bias_variable([fc_hiddenNeurons], "c_bh6")
 
         self.depth_numPixels = depth_height * depth_width
-        assert (fc_hiddenNeurons == self.depth_numPixels), "The number of Neurons must be iqual to the number of output pixels."
+        assert (
+                fc_hiddenNeurons == self.depth_numPixels), "The number of Neurons must be iqual to the number of output pixels."
 
         self.Wh7 = weight_variable([fc_hiddenNeurons, self.depth_numPixels], "c_Wh7")
         self.bh7 = bias_variable([self.depth_numPixels], "c_bh7")
@@ -110,6 +117,7 @@ class Coarse(object):
 
         self.fc1 = None
         self.fc2 = None
+
 
 class Fine(object):
     def __init__(self):
@@ -136,16 +144,27 @@ class Fine(object):
 
         self.conc = None
 
+
 class MonoDeepModel(object):
-    def __init__(self, params, mode, inputSize, outputSize):
+    def __init__(self, mode, params):
+        print(params)
+
         self.params = params
         self.mode = mode
-        self.tf_keep_prob = params.dropout
+        self.tf_keep_prob = params['dropout']
 
         # Variables initialization according to the chosen dataset
-        _, self.image_height, self.image_width, self.image_nchannels = inputSize # Input
-        _, self.depth_height, self.depth_width = outputSize                      # Output
-        self.fc_hiddenNeurons = self.depth_height*self.depth_width
+        # print(params['inputSize'])
+        # print(params['outputSize'])
+        # input("Continue...")
+        
+        # TODO: Acredito que seja melhor fazer essa divisao de informacos em monodeep_dataloader.py
+        # self.numTrainSamples, self.numInputs = self.train_dataset.shape
+        # self.numTestSamples, self.numClasses = self.test_labels.shape  # Output
+
+        self.numTrainSamples, self.image_height, self.image_width, self.image_nchannels = params['inputSize']  # Input
+        _, self.depth_height, self.depth_width = params['outputSize']  # Output
+        self.fc_hiddenNeurons = self.depth_height * self.depth_width
 
         # print(params)
         # print(self.image_height, self.image_width,self.image_nchannels)
@@ -156,29 +175,98 @@ class MonoDeepModel(object):
         if self.mode == 'test':
             return
 
-        self.build_losses()
+        # self.build_losses()
         self.build_summaries()
 
         self.countParams()
 
-    def build_model(self):
-        print("\n[Network/Model] Build Network Model...")
-
-        # Layers
-        self.coarse = Coarse(self.image_height, self.image_width, self.depth_height, self.depth_width, self.fc_hiddenNeurons)
+    def createLayers_monodeep(self):
+        self.coarse = Coarse(self.image_height, self.image_width, self.depth_height, self.depth_width,
+                             self.fc_hiddenNeurons)
         self.fine = Fine()
 
-        with tf.name_scope("Inputs"):
+    def build_model(self):
+        # ======================
+        #  Tensorflow Variables
+        # ======================
+        print("\n[Network/Model] Build Network Model...")
+      
+        # Input data. For the training data, we use a placeholder that will be fed at run time with a training minibatch (SGD).
+        with tf.name_scope('Inputs'):
             # TODO: Mudar nomes para tf_image e tf_depth/tf_disp
-            self.tf_image = tf.placeholder(tf.float32, shape=(None, self.image_height, self.image_width, self.image_nchannels), name="tf_image")
-            self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width), name="tf_labels")
-            self.tf_keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+            self.tf_image = tf.placeholder(tf.float32,
+                                           shape=(None, self.image_height, self.image_width, self.image_nchannels),
+                                           name='image')
+            self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width),
+                                            name='labels')
+            self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
 
-            self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE)
-        
+            self.tf_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+            self.tf_global_step = tf.Variable(0, trainable=False,
+                                              name='global_step')  # Count the number of steps taken.
+            self.tf_bn_train = tf.placeholder(tf.bool, name='bn_train')  # Boolean value to guide batchnorm
+            self.learningRate = self.params['learning_rate']
+            if self.params['ldecay']:
+                self.learningRate = tf.train.exponential_decay(self.learningRate, self.tf_global_step, 1000, 0.95,
+                                                               staircase=True, name='ldecay')
+
+            tf.add_to_collection('image', self.tf_image)
+            tf.add_to_collection('labels', self.tf_labels)
+            tf.add_to_collection('keep_prob', self.tf_keep_prob)
+            tf.add_to_collection('global_step', self.tf_global_step)
+            tf.add_to_collection('bn_train', self.tf_bn_train)
+            tf.add_to_collection('learning_rate', self.learningRate)
+            tf.add_to_collection('ldecay', self.learningRate)
+
+        # ==============
+        #  Select Model
+        # ==============
+        try:
+            if self.params['model_name'] == 'monodeep':
+                self.createLayers_monodeep()
+            else:
+                raise ValueError
+        except ValueError:
+            print("[ValueError] Check value of 'model_name' specified.")
+            raise SystemExit
+
+        # ----- Network Output (Predictions) ----- #
         with tf.name_scope("Outputs"):
             self.tf_predCoarse = self.build_modelCoarse(self.tf_image)
             self.tf_predFine = self.build_modelFine(self.tf_image, self.tf_predCoarse)
+
+            tf.add_to_collection('predCoarse', self.tf_predCoarse)
+            tf.add_to_collection('predFine', self.tf_predFine)
+
+        # ----- Network Losses ----- #
+        with tf.name_scope("Losses"):
+            # self.tf_lossF = self.tf_MSE(self.tf_predFine, self.tf_log_labels)
+            self.tf_lossF = self.tf_L(self.tf_predFine, self.tf_log_labels)
+
+        # ----- Network Optimizer ----- #
+        with tf.name_scope("Optimizer"):
+            self.optimizer_f = tf.train.AdamOptimizer(self.learningRate).minimize(self.tf_lossF, global_step=self.tf_global_step)
+
+        # FIXME: Utilizar o Optimizer do bitboyslab
+        # with tf.name_scope("Optimizer"):
+        #     # self.optimizer = tf.train.GradientDescentOptimizer(self.learningRate).minimize(self.tf_loss,
+        #     #                                                                            global_step=self.global_step)
+        #     self.optimizer = tf.train.AdamOptimizer(self.learningRate)
+        #     self.train = self.optimizer.minimize(self.tf_lossF, global_step=self.tf_global_step)
+        #     tf.add_to_collection("train_step", self.train)
+
+
+        # ---- Predictions Evaluation ----- #
+        with tf.name_scope("Accuracy"):
+            # TODO: Calcular a Accuracy utilizando o tensorflow ao inves de numpy
+            # with tf.name_scope("Evaluating_accuracy") as scope:
+            #     # correct_prediction = tf.equal(tf.argmax(tf.cast(self.Y, dtype=tf.int64)), self.tf_labels)
+            #     # self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+            #
+            #     self.accuracy = tf.reduce_sum(tf.equal(tf.argmax(self.Y, 1),tf.argmax(self.tf_labels))) / self.params['batch_size']
+            #
+            #     accuracy_summary = tf.summary.scalar("accuracy", self.accuracy)
+            pass
 
         # Debug
         # print(self.tf_image)
@@ -191,19 +279,25 @@ class MonoDeepModel(object):
         # Network Layers
         self.coarse.conv1 = tf.nn.conv2d(image, filter=self.coarse.Wh1, strides=[1, 4, 4, 1], padding='SAME')
         self.coarse.hidden1 = tf.nn.relu(self.coarse.conv1 + self.coarse.bh1)
-        self.coarse.pool1 = tf.nn.max_pool(self.coarse.hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        self.coarse.pool1 = tf.nn.max_pool(self.coarse.hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                                           padding='SAME')
 
-        self.coarse.conv2 = tf.nn.conv2d(self.coarse.pool1, filter=self.coarse.Wh2, strides=[1, 1, 1, 1], padding='SAME')
+        self.coarse.conv2 = tf.nn.conv2d(self.coarse.pool1, filter=self.coarse.Wh2, strides=[1, 1, 1, 1],
+                                         padding='SAME')
         self.coarse.hidden2 = tf.nn.relu(self.coarse.conv2 + self.coarse.bh2)
-        self.coarse.pool2 = tf.nn.max_pool(self.coarse.hidden2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        self.coarse.pool2 = tf.nn.max_pool(self.coarse.hidden2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                                           padding='SAME')
 
-        self.coarse.conv3 = tf.nn.conv2d(self.coarse.pool2, filter=self.coarse.Wh3, strides=[1, 1, 1, 1], padding='SAME')
+        self.coarse.conv3 = tf.nn.conv2d(self.coarse.pool2, filter=self.coarse.Wh3, strides=[1, 1, 1, 1],
+                                         padding='SAME')
         self.coarse.hidden3 = tf.nn.relu(self.coarse.conv3 + self.coarse.bh3)
 
-        self.coarse.conv4 = tf.nn.conv2d(self.coarse.hidden3, filter=self.coarse.Wh4, strides=[1, 1, 1, 1], padding='SAME')
+        self.coarse.conv4 = tf.nn.conv2d(self.coarse.hidden3, filter=self.coarse.Wh4, strides=[1, 1, 1, 1],
+                                         padding='SAME')
         self.coarse.hidden4 = tf.nn.relu(self.coarse.conv4 + self.coarse.bh4)
 
-        self.coarse.conv5 = tf.nn.conv2d(self.coarse.hidden4, filter=self.coarse.Wh5, strides=[1, 2, 2, 1], padding='SAME')
+        self.coarse.conv5 = tf.nn.conv2d(self.coarse.hidden4, filter=self.coarse.Wh5, strides=[1, 2, 2, 1],
+                                         padding='SAME')
         self.coarse.hidden5 = tf.nn.relu(self.coarse.conv5 + self.coarse.bh5)
         shape_h5 = self.coarse.hidden5.get_shape().as_list()
 
@@ -214,9 +308,11 @@ class MonoDeepModel(object):
         # TODO: Remover três linhas abaixo
         self.hidden7_drop = tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob)
         self.hidden7_matmul = tf.matmul(tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob), self.coarse.Wh7)
-        self.hidden7_bias = tf.matmul(tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob), self.coarse.Wh7) + self.coarse.bh7
+        self.hidden7_bias = tf.matmul(tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob),
+                                      self.coarse.Wh7) + self.coarse.bh7
 
-        self.coarse.hidden7 = tf.matmul(tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob), self.coarse.Wh7) + self.coarse.bh7 # Linear
+        self.coarse.hidden7 = tf.matmul(tf.nn.dropout(self.coarse.hidden6, self.tf_keep_prob),
+                                        self.coarse.Wh7) + self.coarse.bh7  # Linear
 
         self.coarse.fc2 = tf.reshape(self.coarse.hidden7, [-1, self.depth_height, self.depth_width])
 
@@ -238,32 +334,30 @@ class MonoDeepModel(object):
 
         self.fine.conv3 = tf.nn.conv2d(self.fine.hidden2, filter=self.fine.Wh3, strides=[1, 1, 1, 1], padding='SAME')
         # hidden3 = tf.nn.relu(conv3 + fine.bh3) # ReLU
-        self.fine.hidden3 = self.fine.conv3 + self.fine.bh3 # Linear
+        self.fine.hidden3 = self.fine.conv3 + self.fine.bh3  # Linear
 
         return self.fine.hidden3[:, :, :, 0]
-
-    
 
     # TODO: Mudar
     @staticmethod
     def tf_MSE(y, y_):
         print("[Network/Model] Loss Function: MSE")
         # Check if y and y* have the same dimensions
-        assert((y.shape[1] == y_.shape[1]) and (y.shape[2] == y_.shape[2])), "Houston we've got a problem"
+        assert ((y.shape[1] == y_.shape[1]) and (y.shape[2] == y_.shape[2])), "Houston we've got a problem"
 
         # Variables
         batchSize, height, width = y_.get_shape().as_list()
-        numPixels = height*width
+        numPixels = height * width
         tf_npixels = tf.cast(tf.constant(numPixels), tf.float32)
 
-        return tf.reduce_sum(tf.pow(y_ - y, 2))/tf_npixels
+        return tf.reduce_sum(tf.pow(y_ - y, 2)) / tf_npixels
 
     @staticmethod
     def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
         print("[Network/Model] Loss Function: Eigen's Log Depth")
         # Local Variables
         batchSize, height, width = tf_log_y_.get_shape().as_list()
-        numPixels = height*width
+        numPixels = height * width
 
         # Tensorflow Variables
         # tf_npixels = tf.cast(tf.constant(batchSize*numPixels), tf.float32) # TODO: Posso retirar o tamanho do batch da conta? Lembrando que os tensores foram definidos sem especificar o tamanho do batch, logo nao tenho essa informacao aki.
@@ -273,13 +367,13 @@ class MonoDeepModel(object):
         tf_gx_d = gradient_x(tf_d)
         tf_gy_d = gradient_y(tf_d)
 
-        mean_term = (tf.reduce_sum(tf.pow(tf_d, 2))/tf_npixels)
-        variance_term = ((gamma/tf.pow(tf_npixels, 2))*tf.pow(tf.reduce_sum(tf_d), 2))
-        grads_term = (tf.reduce_sum(tf.pow(tf_gx_d,2))+tf.reduce_sum(tf.pow(tf_gy_d,2)))/tf_npixels
+        mean_term = (tf.reduce_sum(tf.pow(tf_d, 2)) / tf_npixels)
+        variance_term = ((gamma / tf.pow(tf_npixels, 2)) * tf.pow(tf.reduce_sum(tf_d), 2))
+        grads_term = (tf.reduce_sum(tf.pow(tf_gx_d, 2)) + tf.reduce_sum(tf.pow(tf_gy_d, 2))) / tf_npixels
 
-        #FIXME: variance_term should be negative
-        tf_loss_d = mean_term+variance_term+grads_term
-        
+        # FIXME: variance_term should be negative
+        tf_loss_d = mean_term + variance_term + grads_term
+
         return tf_loss_d
 
     # TODO: Utilizar a tf_mse do stereoCNN e adicionar L2Norm
@@ -287,7 +381,6 @@ class MonoDeepModel(object):
         with tf.name_scope("Losses"):
             # self.tf_lossF = self.tf_MSE(self.tf_predFine, self.tf_log_labels)
             self.tf_lossF = self.tf_L(self.tf_predFine, self.tf_log_labels)
-
 
     # TODO: Criar summaries das variaveis internas do modelo
     def build_summaries(self):
