@@ -142,24 +142,14 @@ class MonoDeepModel(object):
 
         self.params = params
         self.mode = mode
-        self.tf_keep_prob = params['dropout']
 
-        # Variables initialization according to the chosen dataset
-        # print(params['inputSize'])
-        # print(params['outputSize'])
-        # input("Continue...")
+        model_index = 0
+        self.model_collection = ['model_' + str(model_index)]
 
-        # TODO: Acredito que seja melhor fazer essa divisao de informacos em monodeep_dataloader.py
-        # self.numTrainSamples, self.numInputs = self.train_dataset.shape
-        # self.numTestSamples, self.numClasses = self.test_labels.shape  # Output
-
-        self.numTrainSamples, self.image_height, self.image_width, self.image_nchannels = params['inputSize']  # Input
+        # Parses Values
+        _, self.image_height, self.image_width, self.image_nchannels = params['inputSize']  # Input
         _, self.depth_height, self.depth_width = params['outputSize']  # Output
         self.fc_hiddenNeurons = self.depth_height * self.depth_width
-
-        # print(params)
-        # print(self.image_height, self.image_width,self.image_nchannels)
-        # print(self.depth_height, self.depth_width)
 
         self.build_model()
 
@@ -195,18 +185,17 @@ class MonoDeepModel(object):
             self.tf_global_step = tf.Variable(0, trainable=False,
                                               name='global_step')  # Count the number of steps taken.
             self.tf_bn_train = tf.placeholder(tf.bool, name='bn_train')  # Boolean value to guide batchnorm
-            self.learningRate = self.params['learning_rate']
+            self.tf_learningRate = self.params['learning_rate']
             if self.params['ldecay']:
-                self.learningRate = tf.train.exponential_decay(self.learningRate, self.tf_global_step, 1000, 0.95,
-                                                               staircase=True, name='ldecay')
+                self.tf_learningRate = tf.train.exponential_decay(self.tf_learningRate, self.tf_global_step, 1000, 0.95,
+                                                                  staircase=True, name='ldecay')
 
             tf.add_to_collection('image', self.tf_image)
             tf.add_to_collection('labels', self.tf_labels)
             tf.add_to_collection('keep_prob', self.tf_keep_prob)
             tf.add_to_collection('global_step', self.tf_global_step)
             tf.add_to_collection('bn_train', self.tf_bn_train)
-            tf.add_to_collection('learning_rate', self.learningRate)
-            tf.add_to_collection('ldecay', self.learningRate)
+            tf.add_to_collection('learning_rate', self.tf_learningRate)
 
         # ==============
         #  Select Model
@@ -235,28 +224,11 @@ class MonoDeepModel(object):
 
         # ----- Network Optimizer ----- #
         with tf.name_scope("Optimizer"):
-            self.optimizer_f = tf.train.AdamOptimizer(self.learningRate).minimize(self.tf_lossF,
-                                                                                  global_step=self.tf_global_step)
-
-        # FIXME: Utilizar o Optimizer do bitboyslab
-        # with tf.name_scope("Optimizer"):
-        #     # self.optimizer = tf.train.GradientDescentOptimizer(self.learningRate).minimize(self.tf_loss,
-        #     #                                                                            global_step=self.global_step)
-        #     self.optimizer = tf.train.AdamOptimizer(self.learningRate)
-        #     self.train = self.optimizer.minimize(self.tf_lossF, global_step=self.tf_global_step)
-        #     tf.add_to_collection("train_step", self.train)
-
-        # ---- Predictions Evaluation ----- #
-        with tf.name_scope("Accuracy"):
-            # TODO: Calcular a Accuracy utilizando o tensorflow ao inves de numpy
-            # with tf.name_scope("Evaluating_accuracy") as scope:
-            #     # correct_prediction = tf.equal(tf.argmax(tf.cast(self.Y, dtype=tf.int64)), self.tf_labels)
-            #     # self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-            #
-            #     self.accuracy = tf.reduce_sum(tf.equal(tf.argmax(self.Y, 1),tf.argmax(self.tf_labels))) / self.params['batch_size']
-            #
-            #     accuracy_summary = tf.summary.scalar("accuracy", self.accuracy)
-            pass
+            # optimizer = tf.train.GradientDescentOptimizer(self.learningRate).minimize(self.tf_loss,
+            #                                                global_step=self.global_step)
+            optimizer = tf.train.AdamOptimizer(self.tf_learningRate)
+            self.train = optimizer.minimize(self.tf_lossF, global_step=self.tf_global_step)
+            tf.add_to_collection("train_step", self.train)
 
         # Debug
         # print(self.tf_image)
@@ -374,7 +346,11 @@ class MonoDeepModel(object):
 
     # TODO: Criar summaries das variaveis internas do modelo
     def build_summaries(self):
-        print("terminar")
+        # Filling Summary Obj
+        with tf.name_scope("Summaries"):
+            tf.summary.scalar('learning_rate', self.tf_learningRate, collections=self.model_collection)
+            tf.summary.scalar('lossF', self.tf_lossF, collections=self.model_collection)
+            tf.summary.scalar('keep_prob', self.tf_keep_prob, collections=self.model_collection)
 
     @staticmethod
     def countParams():

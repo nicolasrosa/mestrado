@@ -150,11 +150,6 @@ def train(args, params):
     # Local Variables
     movMeanLast = 0
     movMean = deque()
-    trainLossHistory = []
-    trainAccHist = []
-    validAccHist = []
-    trainAccRate = 0
-    validAccRate = 0
     fig, axes = createPlotsObj(args.mode, title='Train Predictions')
 
     print('[%s] Selected mode: Train' % appName)
@@ -171,31 +166,19 @@ def train(args, params):
         # TODO: Terminar
         # MonoDeep
         dataloader = MonoDeepDataloader(args, params, args.data_path)
+        params['inputSize'] = dataloader.inputSize
+        params['outputSize'] = dataloader.outputSize
 
         # MonoDepth
         # dataloader = MonodepthDataloader(args.data_path, args.filenames_file, params, args.dataset, args.mode)
         # left = dataloader.left_image_batch
         # right = dataloader.right_image_batch
 
-
-        # TODO: Realmente preciso disso?
-        print(dataloader.inputSize)
-        print(dataloader.outputSize)
-        params['inputSize'] = dataloader.inputSize
-        params['outputSize'] = dataloader.outputSize
-
         model = MonoDeepModel(args.mode, params)
 
         with tf.name_scope("Summaries"):
             # Summary Objects
             summary_writer = tf.summary.FileWriter(save_path + args.log_directory, graph)
-
-            # Filling Summary Obj
-            tf.summary.scalar('learning_rate', model.learningRate, ['model_0'])
-            tf.summary.scalar('lossF', model.tf_lossF, ['model_0'])
-            tf.summary.scalar('keep_prob', model.tf_keep_prob, ['model_0'])
-            # tf.summary.scalar('tf_train_acc', model.tf_train_acc, ['model_0']) # FIXME: Não funciona, acredito q o tensorboard so registra variaveis atreladas ao tensorflow
-            # tf.summary.scalar('tf_valid_acc', model.tf_valid_acc, ['model_0'])
             summary_op = tf.summary.merge_all('model_0')
 
         # Creates Saver Obj
@@ -214,7 +197,7 @@ def train(args, params):
 
         # Proclaim the epochs
         epochs = np.floor(
-            args.batch_size * args.max_steps / model.numTrainSamples)  # TODO: model.numTrainSamples -> dataloader.numTrainSamples
+            args.batch_size * args.max_steps / dataloader.numTrainSamples)
         print('Train with approximately %d epochs' % epochs)
 
         # =================
@@ -225,8 +208,7 @@ def train(args, params):
             start2 = time.time()
 
             # Training Batch and Feed Dictionary Preparation
-            offset = (step * args.batch_size) % (
-                    model.numTrainSamples - args.batch_size)  # Pointer # TODO: model.numTrainSamples -> dataloader.numTrainSamples
+            offset = (step * args.batch_size) % (dataloader.numTrainSamples - args.batch_size)  # Pointer
             # print("offset: %d/%d" % (offset,dataloader.train_labels.shape[0]))
             batch_data_colors = dataloader.train_dataset_crop[offset:(offset + args.batch_size), :, :,
                                 :]  # (idx, height, width, numChannels) - Raw
@@ -234,25 +216,17 @@ def train(args, params):
                          :]  # (idx, height, width, numChannels) - Normalized
             batch_labels = dataloader.train_labels[offset:(offset + args.batch_size), :, :]  # (idx, height, width)
 
-            # TODO: Adicionar tf_bn_train ao modelo. 
             feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels,
                                model.tf_keep_prob: args.dropout}
-            # feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels, 
-            #                   model.tf_keep_prob: args.dropout, model.tf_bn_train: True}				   
 
-            # TODO: Adicionar tf_bn_train ao modelo. 
             feed_dict_valid = {model.tf_image: dataloader.valid_dataset, model.tf_labels: dataloader.valid_labels,
                                model.tf_keep_prob: 1.0}
-            # feed_dict_valid = {model.tf_image: dataloader.valid_dataset, model.tf_labels: dataloader.valid_labels,
-            #                   model.tf_keep_prob: 1.0, model.tf_bn_train: False}
 
-            # TODO: Alterar nome das variaveis para trainPred_c, trainPred_f, validPred, etc.
             # ----- Session Run! ----- #
-            _, log_labels, trPredictions_c, trPredictions_f, trLoss_f, summary_str = session.run(
-                [model.optimizer_f, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF,
-                 summary_op],
-                feed_dict=feed_dict_train)  # Training
-            vPredictions_c, vPredictions_f, vLoss_f = session.run(
+            _, log_labels, train_PredCoarse, train_PredFine, train_lossFine, summary_str = session.run(
+                [model.train, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF,
+                 summary_op], feed_dict=feed_dict_train)  # Training
+            valid_PredCoarse, valid_PredFine, valid_lossF = session.run(
                 [model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid)  # Validation
             # -----
 
@@ -265,7 +239,7 @@ def train(args, params):
             # TODO: Não faz sentido eu ter validAccRate, uma vez que eu não meço Accuracy, eu apenas monitoro o erro.
             # TODO: Validar, original era movMeanAvg <= movMeanAvgLast
             if ENABLE_EARLY_STOP:
-                movMean.append(vLoss_f)
+                movMean.append(valid_lossF)
 
                 if step > AVG_SIZE:
                     movMean.popleft()
@@ -304,17 +278,11 @@ def train(args, params):
 
                 if args.show_train_progress:
                     plot1(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :], log_label=log_labels[0, :, :],
-                          coarse=trPredictions_c[0, :, :], fine=trPredictions_f[0, :, :])
+                          coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
 
                 end2 = time.time()
 
-                print('step: %d/%d | t: %f | Batch trLoss_f: %0.4E | vLoss_f: %0.4E' % (
-                    step, args.max_steps, end2 - start2, trLoss_f, vLoss_f))
-
-            # TODO: Usar Print abaixo:
-            # print(
-            #    'step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | Batch Accuracy: {4:5.4f} | vLoss: {5:>16.4f} | Validation Accuracy: {6:5.4f} '.format(
-            #        step, args.max_steps, end2 - start2, trLoss, trainAccRate, vLoss, validAccRate))
+                print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step, args.max_steps, end2 - start2, train_lossFine, valid_lossF))
 
         end = time.time()
         print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end - start))
@@ -342,7 +310,7 @@ def train(args, params):
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
-        f.write("%s\t\t%s\t\tsteps: %d\ttrLoss_f: %f\n" % (datetime, appName, step, trLoss_f))
+        f.write("%s\t\t%s\t\tsteps: %d\ttrain_lossFine: %f\n" % (datetime, appName, step, train_lossFine))
         f.close()
 
 
@@ -361,11 +329,9 @@ def test(args, params):
     dataloader = MonoDeepDataloader(args, params, args.data_path)
     model = ImportGraph(args.restore_path)
 
-
-    numTestSamples = len(dataloader.test_dataset_crop)
-    predCoarse = np.zeros((numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+    predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
                                  dtype=np.float32)
-    predFine = np.zeros((numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+    predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
                                  dtype=np.float32)
 
     # ==============
@@ -419,7 +385,7 @@ def test(args, params):
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
-        for i in range(len(predFine)):
+        for i in dataloader.numTestSamples:
             def showTestResults(raw, label, coarse, fine):
                 plt.figure(1)
                 axes[0].set_title("Raw[%d]" % i)

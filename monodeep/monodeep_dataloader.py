@@ -52,11 +52,19 @@ class MonoDeepDataloader(object):
             self.test_dataset = data['test_dataset']
             self.test_labels = data['test_labels']
 
+            # Parses Values
             self.inputSize = self.train_dataset.shape
             self.outputSize = self.train_labels.shape
 
+
+            self.numTrainSamples, self.image_height, self.image_width, self.image_nchannels = self.inputSize
+            _, self.depth_height, self.depth_width = self.outputSize
+            self.numTestSamples, _, _, _ = self.test_dataset.shape
+
             # print(self.inputSize)
             # print(self.outputSize)
+            # print(self.numTrainSamples, self.numTestSamples)
+            # input("oi")
 
             print("[Dataset] Loading Dataset...DONE!")
 
