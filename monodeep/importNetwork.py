@@ -33,18 +33,18 @@ class ImportGraph(object):
 
         # Creates local graph and use it in the session
         self.graph = tf.Graph()
-        self.sess = tf.Session(graph=self.graph)        
+        self.sess = tf.Session(graph=self.graph)
         with self.graph.as_default():
             # Import saved model from location 'restore_filepath' into local graph
             print('\n[Network/Restore] Restoring model from file: %s' % restore_filepath)
             saver = tf.train.import_meta_graph(restore_filepath + '.meta', clear_devices=True)
             saver.restore(self.sess, restore_filepath)
             print("[Network/Restore] Model restored!")
-            print("[Network/Restore] Restored variables:\n", tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES), '\n')    
+            print("[Network/Restore] Restored variables:\n", tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES), '\n')
 
             # Gets activation function from saved collection
             # You may need to change this in case you name it differently
-            self.tf_inputs = tf.get_collection('image')[0] # TODO: mudar nome da variavel
+            self.tf_image = tf.get_collection('image')[0]
             self.tf_predCoarse = tf.get_collection('predCoarse')[0]
             self.tf_predFine = tf.get_collection('predFine')[0]
             self.tf_keep_prob = tf.get_collection('keep_prob')[0]
@@ -53,7 +53,7 @@ class ImportGraph(object):
         """ Running the activation function previously imported """
         # The 'inputs' corresponds to name of input placeholder
         data = np.expand_dims(image, 0)  # (idx, height, width, numChannels) - Normalized
-        feed_dict = {self.tf_inputs: data, self.tf_keep_prob: 1.0}
+        feed_dict = {self.tf_image: data, self.tf_keep_prob: 1.0}
 
         # ----- Session Run! ----- #
         predCoarse, predFine = self.sess.run([self.tf_predCoarse, self.tf_predFine], feed_dict=feed_dict)

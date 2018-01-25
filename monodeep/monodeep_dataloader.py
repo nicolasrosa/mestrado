@@ -34,7 +34,7 @@ class MonoDeepDataloader(object):
             self.valid_files_colors_filename = data['valid_colors_files_filename']
             self.valid_files_depth_filename = data['valid_depth_files_filename']
             self.test_files_colors_filename = data['test_colors_files_filename']
-            self.test_files_depth_filename = data['test_depth_files_filename'] 
+            self.test_files_depth_filename = data['test_depth_files_filename']
 
             # Original Images - Cropped
             self.train_dataset_crop = data['train_dataset_crop']
@@ -63,9 +63,9 @@ class MonoDeepDataloader(object):
     def showDatasetInfo(self):
         print("\nDataset Summary")
         print("\t\t\tInputs\t\t     Labels")
-        print('Training set:\t', self.train_dataset.shape,'\t', self.train_labels.shape)
-        print('Validation set:\t', self.valid_dataset.shape,'\t', self.valid_labels.shape)
-        print('Test set:\t', self.test_dataset.shape,'\t', self.test_labels.shape)
+        print('Training set:\t', self.train_dataset.shape, '\t', self.train_labels.shape)
+        print('Validation set:\t', self.valid_dataset.shape, '\t', self.valid_labels.shape)
+        print('Test set:\t', self.test_dataset.shape, '\t', self.test_labels.shape)
 
     def getImageSize(self):
         imageSize = (self.train_dataset.shape[1], self.train_dataset.shape[2])
@@ -78,4 +78,3 @@ class MonoDeepDataloader(object):
     def getImageNumChannels(self):
         numChannels = self.train_dataset.shape[3]
         return numChannels
-

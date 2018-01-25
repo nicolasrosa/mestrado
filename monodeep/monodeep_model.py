@@ -12,15 +12,6 @@ from collections import namedtuple
 # ==================
 #  Global Variables
 # ==================
-# TODO: Remover
-# monodeep_parameters = namedtuple('parameters',
-#                         'height, width, '
-#                         'batch_size, '
-#                         'num_epochs, '
-#                         'max_steps, '
-#                         'dropout, '
-#                         'full_summary')
-
 LOSS_LOG_INITIAL_VALUE = 0.1
 
 
@@ -157,7 +148,7 @@ class MonoDeepModel(object):
         # print(params['inputSize'])
         # print(params['outputSize'])
         # input("Continue...")
-        
+
         # TODO: Acredito que seja melhor fazer essa divisao de informacos em monodeep_dataloader.py
         # self.numTrainSamples, self.numInputs = self.train_dataset.shape
         # self.numTestSamples, self.numClasses = self.test_labels.shape  # Output
@@ -190,10 +181,9 @@ class MonoDeepModel(object):
         #  Tensorflow Variables
         # ======================
         print("\n[Network/Model] Build Network Model...")
-      
+
         # Input data. For the training data, we use a placeholder that will be fed at run time with a training minibatch (SGD).
         with tf.name_scope('Inputs'):
-            # TODO: Mudar nomes para tf_image e tf_depth/tf_disp
             self.tf_image = tf.placeholder(tf.float32,
                                            shape=(None, self.image_height, self.image_width, self.image_nchannels),
                                            name='image')
@@ -245,7 +235,8 @@ class MonoDeepModel(object):
 
         # ----- Network Optimizer ----- #
         with tf.name_scope("Optimizer"):
-            self.optimizer_f = tf.train.AdamOptimizer(self.learningRate).minimize(self.tf_lossF, global_step=self.tf_global_step)
+            self.optimizer_f = tf.train.AdamOptimizer(self.learningRate).minimize(self.tf_lossF,
+                                                                                  global_step=self.tf_global_step)
 
         # FIXME: Utilizar o Optimizer do bitboyslab
         # with tf.name_scope("Optimizer"):
@@ -254,7 +245,6 @@ class MonoDeepModel(object):
         #     self.optimizer = tf.train.AdamOptimizer(self.learningRate)
         #     self.train = self.optimizer.minimize(self.tf_lossF, global_step=self.tf_global_step)
         #     tf.add_to_collection("train_step", self.train)
-
 
         # ---- Predictions Evaluation ----- #
         with tf.name_scope("Accuracy"):
@@ -386,11 +376,10 @@ class MonoDeepModel(object):
     def build_summaries(self):
         print("terminar")
 
-    def countParams(self):
+    @staticmethod
+    def countParams():
         # Count Params
         total_num_parameters = 0
         for variable in tf.trainable_variables():
             total_num_parameters += np.array(variable.get_shape().as_list()).prod()
         print("[Network/Model] Number of trainable parameters: {}".format(total_num_parameters))
-
-
