@@ -15,9 +15,6 @@
 # ===========
 #  Libraries
 # ===========
-import argparse
-import matplotlib.pyplot as plt
-import sys
 import time
 
 # import numpy as np
@@ -27,9 +24,12 @@ from collections import deque
 # from scipy.misc import imshow
 
 from monodeep_dataloader import *
-from monodepth_dataloader import * # TODO: Remover
-from monodeep_model import *
+from temp.monodepth_dataloader import * # TODO: Remover
 from importNetwork import *
+
+# TODO: Organizar
+from monodeep_dataloader_aug import *
+from temp.datasetAugmentation.dataset_preparation2 import *
 
 # ==================
 #  Global Variables
@@ -64,9 +64,12 @@ def argumentHandler():
     parser.add_argument('--model_name', type=str, help="Select Network topology: 'monodeep', etc",
                         default='monodeep')  # TODO: Adicionar mais topologias
     # parser.add_argument(    '--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg')
-    parser.add_argument('-i', '--data_path', type=str,
-                        help="Set relative path to the input dataset <filename>.pkl file",
-                        required=True)
+    # parser.add_argument('-i', '--data_path', type=str,
+    #                     help="Set relative path to the input dataset <filename>.pkl file",
+    #                     required=True)
+    parser.add_argument('-s', '--dataset', action='store', dest='dataset',
+                        help="Selects the dataset ['kitti2012','kitti2015','nyudepth',kittiraw]", required=True)
+
     parser.add_argument('--batch_size', type=int, help="Define the Training batch size", default=16)
     parser.add_argument('--max_steps', type=int, help="Define the number of max Steps", default=1000)
     parser.add_argument('-l', '--learning_rate', type=float, help="Define the initial learning rate", default=1e-4)
@@ -165,14 +168,21 @@ def train(args, params):
     with graph.as_default():
         # TODO: Terminar
         # MonoDeep
-        dataloader = MonoDeepDataloader(args, params, args.data_path)
-        params['inputSize'] = dataloader.inputSize
-        params['outputSize'] = dataloader.outputSize
+        # dataloader = MonoDeepDataloader(args, params, args.data_path)
+        # params['inputSize'] = dataloader.inputSize
+        # params['outputSize'] = dataloader.outputSize
 
         # MonoDepth
         # dataloader = MonodepthDataloader(args.data_path, args.filenames_file, params, args.dataset, args.mode)
         # left = dataloader.left_image_batch
         # right = dataloader.right_image_batch
+
+        # MonoDepth
+        args.data_path = '/media/olorin/Documentos/datasets/' # FIXME: Pensar num metodo melhor de fazer isso
+        dataloader = MonodepthDataloader_new(args.data_path, params, args.dataset, args.mode)
+        # left = dataloader.left_image_batch
+        # right = dataloader.right_image_batch
+        input("Continue...")
 
         model = MonoDeepModel(args.mode, params)
 
