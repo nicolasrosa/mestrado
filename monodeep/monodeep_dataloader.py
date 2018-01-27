@@ -530,70 +530,87 @@ class MonodepthDataloader(object):  # TODO: Assim q tudo estiver funcionando, Mu
         #     self.image_batch = tf.stack([image_o, tf.image.flip_left_right(image_o)], 0)
         #     self.image_batch.set_shape([2, None, None, 3])
 
-    def readImage(self, colors_path, depth_path, showImages: False):
+    def readImage(self, colors_path, depth_path, mode, showImages=False):
         # The DataAugmentation Transforms should be done before the Image Normalization!!!
         # Kitti RGB Image: (375, 1242, 3) uint8     #   NyuDepth RGB Image: (480, 640, 3) uint8 #
         #     Depth Image: (375, 1242)    int32     #          Depth Image: (480, 640)    int32 #
 
-        img_colors = scp.imread(os.path.join(colors_path))
-        img_depth = scp.imread(os.path.join(depth_path))
+        if mode == 'train' or mode == 'valid':
+            img_colors = scp.imread(os.path.join(colors_path))
+            img_depth = scp.imread(os.path.join(depth_path))
 
-        # Data Augmentation
-        img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
+            # Data Augmentation
+            img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
 
-        # Crops Image
-        img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
-        img_depth_crop = cropImage(img_depth_aug,
-                                   size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
+            # Crops Image
+            img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
+            img_depth_crop = cropImage(img_depth_aug,
+                                       size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
 
-        # Normalizes RGB Image and Downsizes Depth Image
-        img_colors_normed = normalizeImage(img_colors_crop)
-        img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
+            # Normalizes RGB Image and Downsizes Depth Image
+            img_colors_normed = normalizeImage(img_colors_crop)
+            img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
-        # Results
-        if showImages:
-            def plot1():
-                scp.imshow(img_colors)
-                scp.imshow(img_depth)
-                scp.imshow(img_colors_aug)
-                scp.imshow(img_depth_aug)
-                scp.imshow(img_colors_crop)
-                scp.imshow(img_depth_crop)
-                scp.imshow(img_colors_normed)
-                scp.imshow(img_depth_downsized)
+            # Results
+            if showImages:
+                def plot1():
+                    scp.imshow(img_colors)
+                    scp.imshow(img_depth)
+                    scp.imshow(img_colors_aug)
+                    scp.imshow(img_depth_aug)
+                    scp.imshow(img_colors_crop)
+                    scp.imshow(img_depth_crop)
+                    scp.imshow(img_colors_normed)
+                    scp.imshow(img_depth_downsized)
 
-            def plot2():
-                fig, axarr = plt.subplots(4, 2)
-                axarr[0, 0].set_title("colors")
-                axarr[0, 0].imshow(img_colors)
-                axarr[0, 1].set_title("depth")
-                axarr[0, 1].imshow(img_depth)
-                axarr[1, 0].set_title("colors_aug")
-                axarr[1, 0].imshow(img_colors_aug)
-                axarr[1, 1].set_title("depth_aug")
-                axarr[1, 1].imshow(img_depth_aug)
-                axarr[2, 0].set_title("colors_crop")
-                axarr[2, 0].imshow(img_colors_crop)
-                axarr[2, 1].set_title("depth_crop")
-                axarr[2, 1].imshow(img_depth_crop)
-                axarr[3, 0].set_title("colors_normed")
-                axarr[3, 0].imshow(img_colors_normed)
-                axarr[3, 1].set_title("depth_downsized")
-                axarr[3, 1].imshow(img_depth_downsized)
+                def plot2():
+                    fig, axarr = plt.subplots(4, 2)
+                    axarr[0, 0].set_title("colors")
+                    axarr[0, 0].imshow(img_colors)
+                    axarr[0, 1].set_title("depth")
+                    axarr[0, 1].imshow(img_depth)
+                    axarr[1, 0].set_title("colors_aug")
+                    axarr[1, 0].imshow(img_colors_aug)
+                    axarr[1, 1].set_title("depth_aug")
+                    axarr[1, 1].imshow(img_depth_aug)
+                    axarr[2, 0].set_title("colors_crop")
+                    axarr[2, 0].imshow(img_colors_crop)
+                    axarr[2, 1].set_title("depth_crop")
+                    axarr[2, 1].imshow(img_depth_crop)
+                    axarr[3, 0].set_title("colors_normed")
+                    axarr[3, 0].imshow(img_colors_normed)
+                    axarr[3, 1].set_title("depth_downsized")
+                    axarr[3, 1].imshow(img_depth_downsized)
 
-                plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=2.0)
+                    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=2.0)
 
-            # plot1()
-            plot2()
+                # plot1()
+                plot2()
 
-            plt.show()  # Display it
+                plt.show()  # Display it
 
-        # Debug
-        # print(img_colors.shape, img_colors.dtype)
-        # print(img_depth.shape, img_depth.dtype)
-        # input()
+            # Debug
+            # print(img_colors.shape, img_colors.dtype)
+            # print(img_depth.shape, img_depth.dtype)
+            # input()
 
-        return img_colors_normed, img_depth_downsized, img_colors_crop, img_depth_crop
+            return img_colors_normed, img_depth_downsized, img_colors_crop, img_depth_crop
+
+        elif mode == 'test':
+            img_colors = scp.imread(os.path.join(colors_path))
+            img_colors_crop = cropImage(img_colors, size=self.datasetObj.imageOutputSize)
+            img_colors_normed = normalizeImage(img_colors_crop)
+
+            img_depth = None
+            img_depth_crop = None
+            img_depth_downsized = None
+
+            if depth_path is not None:
+                img_depth = scp.imread(os.path.join(depth_path)) # TODO: Existem datasets que possuem label, ex: kittiraw_campus
+                img_depth_crop = cropImage(img_depth, size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
+                img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
+
+            return img_colors_normed, img_depth_downsized, img_colors_crop
 
     # Data Augmentation
     @staticmethod

@@ -15,11 +15,16 @@ Most Indicated scenes list (without static scenes):
 **Person**: n/a
 
 # Training
-Ex: ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t
-    ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_residential_continuous.pkl --max_steps 300 -t
+Ex: ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t			(Deprecated)
+    ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_residential_continuous.pkl --max_steps 300 -t	(Deprecated)
+	
+    ./monodeep.py -m train -s kitti2012 --max_steps 1000 -t -d 0.5
+    ./monodeep.py -m train -s kitti2015 --max_steps 1000 -t -d 0.5
+    ./monodeep.py -m train -s kittiraw_campus --max_steps 1000 -t -d 0.5
 
 # Testing
-Ex: ./monodeep.py -m test -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t
+Ex: ./monodeep.py -m test -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t	(Deprecated)
+    ./monodeep.py -m test -s kitti2012 -r output/monodeep/2018-01-27_14-20-07/restore/
 
 # Dataset Prepation Script
 

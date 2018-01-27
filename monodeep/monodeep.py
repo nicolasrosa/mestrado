@@ -206,13 +206,7 @@ def train(args, params):
             args.batch_size * args.max_steps / dataloader.numTrainSamples)
         print('Train with approximately %d epochs' % epochs)
 
-        # =================
-        #  Training Loop
-        # =================
-        start = time.time()
-        fig, axes = createPlotsObj(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
-
-        # TODO: Qual Melhor lugar pra deixar essas variaveis?
+        # Memory Allocation
         batch_data = np.zeros(
             (args.batch_size, dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
             dtype=np.float64)
@@ -228,9 +222,16 @@ def train(args, params):
         valid_labels_o = np.zeros((len(dataloader.valid_labels), dataloader.outputSize[1], dataloader.outputSize[2]),
                                   dtype=np.int32)
 
+        # =================
+        #  Training Loop
+        # =================
+        start = time.time()
+        fig, axes = createPlotsObj(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+
         for i in range((len(dataloader.valid_dataset))):
             valid_dataset_o[i], valid_labels_o[i], _, _ = dataloader.readImage(dataloader.valid_dataset[i],
                                                                                dataloader.valid_labels[i],
+                                                                               mode='valid',
                                                                                showImages=False)
 
         for step in range(args.max_steps):
@@ -249,6 +250,7 @@ def train(args, params):
                 # FIXME: os tipos retornados das variaveis estao errados, quando originalmente eram uint8 e int32, lembrar que o placeholder no tensorflow é float32
                 image, depth, image_crop, depth_crop = dataloader.readImage(batch_data_path[i],
                                                                             batch_labels_path[i],
+                                                                            mode='train',
                                                                             showImages=False)
 
                 # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
@@ -388,42 +390,53 @@ def test(args, params):
 
     # TODO: fazer rotina para pegar imagens externas, nao somente do dataset
     # Loads the dataset and restores a specified trained model.
-    dataloader = MonoDeepDataloader(args, params, args.data_path)
+    args.data_path = '/media/olorin/Documentos/datasets/'  # FIXME: Pensar num metodo melhor de fazer isso
+    dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
     model = ImportGraph(args.restore_path)
 
+    # Memory Allocation
     predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
                           dtype=np.float32)
     predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
                         dtype=np.float32)
 
+    test_dataset_o = np.zeros(
+        (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
+        dtype=np.uint8)
+
+    # Length of test_dataset used, so when there is not test_labels, the variable will still be declared.
+    test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
+                             dtype=np.int32)
+
+    test_dataset_crop_o = np.zeros(
+        (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
+        dtype=np.uint8)
+
     # ==============
     #  Testing Loop
     # ==============
     start = time.time()
-    for i, image in enumerate(dataloader.test_dataset_crop):
+
+
+
+    for i, image_path in enumerate(dataloader.test_dataset):
         start2 = time.time()
+
+        if dataloader.test_labels:  # It's not empty
+            image, depth, image_crop = dataloader.readImage(dataloader.test_dataset[i], dataloader.test_labels[i],
+                                                            mode='test')
+            test_labels_o[i] = depth
+        else:
+            image, _, image_crop = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')
+
+        test_dataset_o[i] = image
+        test_dataset_crop_o[i] = image_crop
+
         predCoarse[i], predFine[i] = model.networkPredict(image)
 
-        def plot_test(raw, coarse, fine):
-            # print(raw.shape)
-            # print(coarse.shape)
-            # print(fine.shape)
-            axes[0].imshow(raw)
-            axes[0].set_title("Raw")
-            axes[1].imshow(coarse)
-            axes[1].set_title("Coarse")
-            axes[2].imshow(fine)
-            axes[2].set_title("Fine")
-            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-
-            plt.pause(0.001)
-
-        # plot_test(raw=image, coarse=predCoarse[0, :, :], fine=predFine[0, :, :])
-
         # Prints Testing Progress
-        # print('k: %d | t: %f' % (k, app.timer2.elapsedTime)) # TODO: ativar
         end2 = time.time()
-        print('step: %d/%d | t: %f' % (i + 1, numTestSamples, end2 - start2))
+        print('step: %d/%d | t: %f' % (i + 1, dataloader.numTestSamples, end2 - start2))
 
     # Testing Finished.
     end = time.time()
@@ -447,7 +460,7 @@ def test(args, params):
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
-        for i in dataloader.numTestSamples:
+        for i in range(dataloader.numTestSamples):
             def showTestResults(raw, label, coarse, fine):
                 plt.figure(1)
                 axes[0].set_title("Raw[%d]" % i)
@@ -462,8 +475,7 @@ def test(args, params):
                 plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
                 plt.pause(0.001)
 
-            showTestResults(dataloader.test_dataset_crop[i], dataloader.test_labels_crop[i], predCoarse[i], predFine[i])
-
+            showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i])
 
 # ======
 #  Main
