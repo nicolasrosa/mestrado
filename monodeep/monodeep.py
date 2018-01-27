@@ -15,21 +15,19 @@
 # ===========
 #  Libraries
 # ===========
+import argparse
 import time
-
 # import numpy as np
 # import pprint
 
 from collections import deque
 # from scipy.misc import imshow
 
-from monodeep_dataloader import *
-from temp.monodepth_dataloader import * # TODO: Remover
-from importNetwork import *
-
 # TODO: Organizar
-from monodeep_dataloader_aug import *
-from temp.datasetAugmentation.dataset_preparation2 import *
+
+from importNetwork import *
+from temp.monodeep_dataloader import *
+from monodeep_dataloader import *
 
 # ==================
 #  Global Variables
@@ -153,7 +151,6 @@ def train(args, params):
     # Local Variables
     movMeanLast = 0
     movMean = deque()
-    fig, axes = createPlotsObj(args.mode, title='Train Predictions')
 
     print('[%s] Selected mode: Train' % appName)
     print('[%s] Selected Params: ' % appName)
@@ -178,11 +175,10 @@ def train(args, params):
         # right = dataloader.right_image_batch
 
         # MonoDepth
-        args.data_path = '/media/olorin/Documentos/datasets/' # FIXME: Pensar num metodo melhor de fazer isso
-        dataloader = MonodepthDataloader_new(args.data_path, params, args.dataset, args.mode)
-        # left = dataloader.left_image_batch
-        # right = dataloader.right_image_batch
-        input("Continue...")
+        args.data_path = '/media/olorin/Documentos/datasets/'  # FIXME: Pensar num metodo melhor de fazer isso
+        dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
+        params['inputSize'] = dataloader.inputSize
+        params['outputSize'] = dataloader.outputSize
 
         model = MonoDeepModel(args.mode, params)
 
@@ -214,22 +210,74 @@ def train(args, params):
         #  Training Loop
         # =================
         start = time.time()
+        fig, axes = createPlotsObj(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+
+        # TODO: Qual Melhor lugar pra deixar essas variaveis?
+        batch_data = np.zeros(
+            (args.batch_size, dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
+            dtype=np.float64)
+        batch_labels = np.zeros(
+            (args.batch_size, dataloader.outputSize[1], dataloader.outputSize[2]), dtype=np.int32)
+        batch_data_colors = np.zeros(
+            (args.batch_size, dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
+            dtype=np.uint8)
+
+        valid_dataset_o = np.zeros(
+            (len(dataloader.valid_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
+            dtype=np.uint8)
+        valid_labels_o = np.zeros((len(dataloader.valid_labels), dataloader.outputSize[1], dataloader.outputSize[2]),
+                                  dtype=np.int32)
+
+        for i in range((len(dataloader.valid_dataset))):
+            valid_dataset_o[i], valid_labels_o[i], _, _ = dataloader.readImage(dataloader.valid_dataset[i],
+                                                                               dataloader.valid_labels[i],
+                                                                               showImages=False)
+
         for step in range(args.max_steps):
             start2 = time.time()
 
-            # Training Batch and Feed Dictionary Preparation
+            # Training and Validation Batches and Feed Dictionary Preparation
             offset = (step * args.batch_size) % (dataloader.numTrainSamples - args.batch_size)  # Pointer
-            # print("offset: %d/%d" % (offset,dataloader.train_labels.shape[0]))
-            batch_data_colors = dataloader.train_dataset_crop[offset:(offset + args.batch_size), :, :,
-                                :]  # (idx, height, width, numChannels) - Raw
-            batch_data = dataloader.train_dataset[offset:(offset + args.batch_size), :, :,
-                         :]  # (idx, height, width, numChannels) - Normalized
-            batch_labels = dataloader.train_labels[offset:(offset + args.batch_size), :, :]  # (idx, height, width)
+            batch_data_path = dataloader.train_dataset[offset:(offset + args.batch_size)]
+            batch_labels_path = dataloader.train_labels[offset:(offset + args.batch_size)]
+
+            # print("offset: %d/%d" % (offset,dataloader.numTrainSamples))
+            # print(batch_data_path)
+            # print(len(batch_data_path))
+
+            for i in range(len(batch_data_path)):
+                # FIXME: os tipos retornados das variaveis estao errados, quando originalmente eram uint8 e int32, lembrar que o placeholder no tensorflow é float32
+                image, depth, image_crop, depth_crop = dataloader.readImage(batch_data_path[i],
+                                                                            batch_labels_path[i],
+                                                                            showImages=False)
+
+                # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
+
+                batch_data[i] = image
+                batch_labels[i] = depth
+                batch_data_colors[i] = image_crop
+
+                def debugPlot():
+                    # plt.figure()
+                    # plt.imshow(image)
+                    # plt.figure()
+                    # plt.imshow(batch_data[i])
+                    # plt.figure()
+                    # plt.imshow(depth)
+                    # plt.figure()
+                    # plt.imshow(batch_labels[i])
+                    plt.figure()
+                    plt.imshow(image_crop)
+                    plt.figure()
+                    plt.imshow(batch_data_colors[i])
+                    plt.show()
+
+                # debugPlot()
 
             feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels,
                                model.tf_keep_prob: args.dropout}
 
-            feed_dict_valid = {model.tf_image: dataloader.valid_dataset, model.tf_labels: dataloader.valid_labels,
+            feed_dict_valid = {model.tf_image: valid_dataset_o, model.tf_labels: valid_labels_o,
                                model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
@@ -244,7 +292,6 @@ def train(args, params):
                 # Write information to TensorBoard
                 summary_writer.add_summary(summary_str, step)
                 summary_writer.flush()  # Don't forget this command! It makes sure Python writes the summaries to the log-file
-
 
             # TODO: Não faz sentido eu ter validAccRate, uma vez que eu não meço Accuracy, eu apenas monitoro o erro.
             # TODO: Validar, original era movMeanAvg <= movMeanAvgLast
@@ -292,7 +339,11 @@ def train(args, params):
 
                 end2 = time.time()
 
-                print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step, args.max_steps, end2 - start2, train_lossFine, valid_lossF))
+                print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step,
+                                                                                                            args.max_steps,
+                                                                                                            end2 - start2,
+                                                                                                            train_lossFine,
+                                                                                                            valid_lossF))
 
         end = time.time()
         print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end - start))
@@ -329,7 +380,8 @@ def train(args, params):
 # ========= #
 def test(args, params):
     # Local Variables
-    fig, axes = createPlotsObj(args.mode, title='Test Predictions')
+    fig, axes = createPlotsObj(args.mode,
+                               title='Test Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
     print('[%s] Selected mode: Test' % appName)
     print('[%s] Selected Params: %s' % (appName, args))
@@ -340,9 +392,9 @@ def test(args, params):
     model = ImportGraph(args.restore_path)
 
     predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                                 dtype=np.float32)
+                          dtype=np.float32)
     predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                                 dtype=np.float32)
+                        dtype=np.float32)
 
     # ==============
     #  Testing Loop
