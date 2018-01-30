@@ -13,6 +13,9 @@ class ImportGraph(object):
     """  Importing and running isolated TF graph """
 
     def __init__(self, restore_path):
+        # Local Variables
+        restore_filepath = None
+
         # Get the Path of the Model to be Restored
         restore_files = os.listdir(restore_path)
         assert len(

@@ -1,6 +1,8 @@
 # ===================
 #  Class Declaration
 # ===================
+
+
 class datasetNyuDepth(object):
     def __init__(self, name, dataset_path):
         self.path = dataset_path

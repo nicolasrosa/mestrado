@@ -15,6 +15,7 @@ from skimage import dtype_limits
 from utils.kitti import *
 from utils.nyudepth import *
 
+
 # from temp.datasetAugmentation.dataset_preparation2 import *
 
 # ==================
@@ -308,10 +309,11 @@ def normalizeImage(img):
 
     return normed
 
+
 def adjust_gamma(image, gamma, gain):
     scale = float(dtype_limits(image, True)[1] - dtype_limits(image, True)[0])  # 255.0
 
-    return ((image / scale) ** gamma) * scale * gain # float64
+    return ((image / scale) ** gamma) * scale * gain  # float64
 
 
 def adjust_brightness(image, brightness):
@@ -587,8 +589,10 @@ class MonodepthDataloader(object):
             img_depth_downsized = None
 
             if depth_path is not None:
-                img_depth = scp.imread(os.path.join(depth_path)) # TODO: Existem datasets que possuem label, ex: kittiraw_campus
-                img_depth_crop = cropImage(img_depth, size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
+                img_depth = scp.imread(
+                    os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
+                img_depth_crop = cropImage(img_depth,
+                                           size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
                 img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             return img_colors_normed, img_depth_downsized, img_colors_crop

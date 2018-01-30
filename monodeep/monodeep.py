@@ -36,6 +36,7 @@ ENABLE_EARLY_STOP = True
 ENABLE_RESTORE = True
 ENABLE_TENSORBOARD = True
 ENABLE_SAVE_CHECKPOINT = False
+SAVE_TEST_DISPARITIES = True
 SHOW_TEST_DISPARITIES = True
 
 # Early Stop Configuration
@@ -58,7 +59,7 @@ def argumentHandler():
     # parser.add_argument(    '--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg')
     parser.add_argument('-i', '--data_path', type=str,
                         help="Set relative path to the input dataset <filename>.pkl file",
-                       default='/media/olorin/Documentos/datasets/')
+                        default='/media/olorin/Documentos/datasets/')
 
     parser.add_argument('-s', '--dataset', action='store', dest='dataset',
                         help="Selects the dataset ['kitti2012','kitti2015','nyudepth',kittiraw]", required=True)
@@ -117,6 +118,9 @@ def createSaveFolder():
 
 
 def createPlotsObj(mode, title):
+    # Local Variables
+    fig, axes = None, None
+
     if mode == 'train':
         # TODO: Mover, Validar
         fig, axes = plt.subplots(5, 1)
@@ -167,7 +171,8 @@ def train(args, params):
 
         def test_dataAug():
             for i in range(10):
-                image, _, _,_ = dataloader.readImage(dataloader.train_dataset[i], dataloader.train_labels[i], mode='train')
+                image, _, _, _ = dataloader.readImage(dataloader.train_dataset[i], dataloader.train_labels[i],
+                                                      mode='train')
             input("Continue")
 
         # test_dataAug() # TODO: Remover, após terminar de implementar dataAugmentation Transforms
@@ -186,7 +191,9 @@ def train(args, params):
     print("\n[Network/Training] Running built graph...")
     with tf.Session(graph=graph) as session:
         # Local Variables
-        stabCounter = 0
+        step, stabCounter = 0, 0
+        train_lossF, valid_lossF = None, None
+
         tf.global_variables_initializer().run()
 
         print("[Network/Training] Training Initialized!\n")
@@ -363,7 +370,9 @@ def train(args, params):
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
-        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\n" % (datetime, appName, args.dataset, step, train_lossF, valid_lossF)) # TODO: Nao salvar o appName, e sim o nome do model utilizado.
+        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\n" % (
+            datetime, appName, args.dataset, step, train_lossF,
+            valid_lossF))  # TODO: Nao salvar o appName, e sim o nome do model utilizado.
         f.close()
 
 
@@ -443,7 +452,6 @@ def test(args, params):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
-    SAVE_TEST_DISPARITIES = False
     if SAVE_TEST_DISPARITIES:
         np.save(output_directory + 'test_coarse_disparities.npy', predCoarse)
         np.save(output_directory + 'test_fine_disparities.npy', predFine)
@@ -472,6 +480,7 @@ def test(args, params):
                 # plt.show()
 
             showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i])
+
 
 # ======
 #  Main
