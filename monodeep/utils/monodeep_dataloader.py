@@ -1,19 +1,19 @@
 # ===========
 #  Libraries
 # ===========
-from __future__ import absolute_import, division, print_function
-# from scipy.misc import imread, imshow
-from scipy import misc as scp
-
+import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import os
 import sys
 import glob
-import numpy as np
-import matplotlib.pyplot as plt
+
+from scipy import misc as scp
 from skimage import exposure
 from skimage import dtype_limits
 
+from utils.kitti import *
+from utils.nyudepth import *
 
 # from temp.datasetAugmentation.dataset_preparation2 import *
 
@@ -308,41 +308,22 @@ def normalizeImage(img):
 
     return normed
 
+def adjust_gamma(image, gamma, gain):
+    scale = float(dtype_limits(image, True)[1] - dtype_limits(image, True)[0])  # 255.0
+
+    return ((image / scale) ** gamma) * scale * gain # float64
+
+
+def adjust_brightness(image, brightness):
+    scale = float(dtype_limits(image, True)[1] - dtype_limits(image, True)[0])  # 255.0
+
+    return ((image / scale) * brightness) * scale  # float64
+
 
 # ===================
 #  Class Declaration
 # ===================
-class datasetKitti(object):
-    def __init__(self, name, dataset_path):
-        self.path = dataset_path
-        self.name = name
-        self.type = 'kitti'
-
-        self.imageInputSize = [376, 1241]
-        self.depthInputSize = [376, 1226]
-
-        self.imageOutputSize = [172, 576]
-        self.depthOutputSize = [43, 144]
-
-        print("[monodeep/Dataloader] datasetKitti object created.")
-
-
-class datasetNyuDepth(object):
-    def __init__(self, name, dataset_path):
-        self.path = dataset_path
-        self.name = name
-        self.type = 'nyudepth'
-
-        self.imageInputSize = [480, 640]
-        self.depthInputSize = [480, 640]
-
-        self.imageOutputSize = [228, 304]
-        self.depthOutputSize = [57, 76]
-
-        print("[monodeep/Dataloader] datasetNyuDepth object created.")
-
-
-class MonodepthDataloader(object):  # TODO: Assim q tudo estiver funcionando, Mudar nome
+class MonodepthDataloader(object):
     """monodepth dataloader"""
 
     def __init__(self, data_path, params, dataset, mode, TRAIN_VALID_RATIO=0.8):
@@ -616,52 +597,63 @@ class MonodepthDataloader(object):  # TODO: Assim q tudo estiver funcionando, Mu
     @staticmethod
     def augment_image_pair(image, depth):
         """ATTENTION! Remember to also reproduce the transforms in the depth image. However, colors transformations can DEGRADE depth information!!!"""
+        # Gets `image` info
+        dtype = image.dtype.type  # Needs to be <class 'numpy.uint8'>
+
+        # Copy
+        image_aug = image
+        depth_aug = depth
+
         # Randomly flip images (Horizontally)
         do_flip = np.random.uniform(0, 1)
         if do_flip > 0.5:
             image_aug = np.flip(image, axis=1)
             depth_aug = np.flip(depth, axis=1)
-        else:
-            image_aug = image
-            depth_aug = depth
 
         # Randomly shift gamma
         random_gamma = np.random.uniform(low=0.8, high=1.2)
-        # random_gamma = 1 # Test
-        # image_aug = image ** random_gamma
-        image_aug = exposure.adjust_gamma(image_aug, gamma=random_gamma)
+        # random_gamma = 5 # Test
+        image_aug = adjust_gamma(image=image_aug, gamma=random_gamma, gain=1)
 
         # FIXME: Not working properly
         # Randomly shift brightness
         random_brightness = np.random.uniform(0.5, 2.0)
-        scale = float(dtype_limits(image, True)[1] - dtype_limits(image, True)[0])  # 255.0
+        # random_brightness = 100
+        # image_aug = adjust_brightness(image=image_aug, brightness=random_brightness)
 
-        # image_aug = image_aug * 1.0
-        # image_aug = image_aug * random_brightness
-        # image_aug = ((image_aug / scale) ** random_brightness) * scale
-        # image_aug = exposure.rescale_intensity(image_aug, out_range=(0, 255))
-
-        # FIXME: Not working properly
         # Randomly shift color
         random_colors = np.random.uniform(0.8, 1.2, 3)
         white = np.ones([np.shape(image)[0], np.shape(image)[1]])
         color_image = np.stack([white * random_colors[i] for i in range(3)], axis=2)
-        # image_aug *= color_image
-        # image_aug = np.multiply(image_aug, color_image)
+        image_aug = np.multiply(image_aug, color_image)
 
-        # TODO: Implementar rotinas de verificação para checar se as transformações não estão saturando os valores de intensidades dos pixels.
-        # FIXME: Not working properly
         # Saturate
-        # image_aug = np.round(np.clip(image_aug, 0, 255))
+        image_aug = dtype(exposure.rescale_intensity(image_aug, out_range="uint8"))
 
         # Debug
-        # print("do_flip:", do_flip)
-        # print("random_gamma:", random_gamma)
-        # print("random_brightness:", random_brightness)
-        # print("random_colors", random_colors)
-        # print("image - (min: %d, max: %d)" % (np.min(image), np.max(image)))
-        # print("image_aug - (min: %d, max: %d)" % (np.min(image_aug), np.max(image_aug)))
-        # print(image[0][:][:])
-        # print(image_aug[0][:][:])
+        def debug():
+            print("do_flip:", do_flip)
+            print("random_gamma:", random_gamma)
+            print("random_brightness:", random_brightness)
+            print("random_colors:", random_colors)
+            print("image - (min: %d, max: %d)" % (np.min(image), np.max(image)))
+            print("image_aug - (min: %d, max: %d)" % (np.min(image_aug), np.max(image_aug)))
+            # print(image.dtype, image_aug.dtype)
+            print()
+
+            def showImages():
+                plt.figure(1)
+                plt.imshow(image)
+                plt.title("image")
+                plt.figure(2)
+                plt.imshow(image_aug)
+                plt.title("image_aug")
+                plt.pause(2)
+
+            # scp.imshow(image)
+            # scp.imshow(image_aug)
+            showImages()
+
+        # debug()
 
         return image_aug, depth_aug

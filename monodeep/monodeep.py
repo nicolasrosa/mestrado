@@ -4,8 +4,6 @@
 # =======
 #  To-Do
 # =======
-# This Coarse-to-Fine Network Architecture predicts the log depth (log y).
-
 # TODO: Adaptar o código para tambem funcionar com o tamanho do nyuDepth
 # TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
 # TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
@@ -21,13 +19,9 @@ import time
 # import pprint
 
 from collections import deque
-# from scipy.misc import imshow
 
-# TODO: Organizar
-
-from importNetwork import *
-from temp.monodeep_dataloader import *
-from monodeep_dataloader import *
+from utils.importNetwork import *
+from utils.monodeep_dataloader import *
 
 # ==================
 #  Global Variables
@@ -62,9 +56,10 @@ def argumentHandler():
     parser.add_argument('--model_name', type=str, help="Select Network topology: 'monodeep', etc",
                         default='monodeep')  # TODO: Adicionar mais topologias
     # parser.add_argument(    '--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg')
-    # parser.add_argument('-i', '--data_path', type=str,
-    #                     help="Set relative path to the input dataset <filename>.pkl file",
-    #                     required=True)
+    parser.add_argument('-i', '--data_path', type=str,
+                        help="Set relative path to the input dataset <filename>.pkl file",
+                       default='/media/olorin/Documentos/datasets/')
+
     parser.add_argument('-s', '--dataset', action='store', dest='dataset',
                         help="Selects the dataset ['kitti2012','kitti2015','nyudepth',kittiraw]", required=True)
 
@@ -163,24 +158,19 @@ def train(args, params):
     # -----------------------------------------
     graph = tf.Graph()
     with graph.as_default():
-        # TODO: Terminar
-        # MonoDeep
-        # dataloader = MonoDeepDataloader(args, params, args.data_path)
-        # params['inputSize'] = dataloader.inputSize
-        # params['outputSize'] = dataloader.outputSize
-
         # MonoDepth
-        # dataloader = MonodepthDataloader(args.data_path, args.filenames_file, params, args.dataset, args.mode)
-        # left = dataloader.left_image_batch
-        # right = dataloader.right_image_batch
-
-        # MonoDepth
-        args.data_path = '/media/olorin/Documentos/datasets/'  # FIXME: Pensar num metodo melhor de fazer isso
         dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
         params['inputSize'] = dataloader.inputSize
         params['outputSize'] = dataloader.outputSize
 
         model = MonoDeepModel(args.mode, params)
+
+        def test_dataAug():
+            for i in range(10):
+                image, _, _,_ = dataloader.readImage(dataloader.train_dataset[i], dataloader.train_labels[i], mode='train')
+            input("Continue")
+
+        # test_dataAug() # TODO: Remover, após terminar de implementar dataAugmentation Transforms
 
         with tf.name_scope("Summaries"):
             # Summary Objects
@@ -251,7 +241,7 @@ def train(args, params):
                 image, depth, image_crop, depth_crop = dataloader.readImage(batch_data_path[i],
                                                                             batch_labels_path[i],
                                                                             mode='train',
-                                                                            showImages=False)
+                                                                            showImages=True)
 
                 # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
 
@@ -283,7 +273,7 @@ def train(args, params):
                                model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
-            _, log_labels, train_PredCoarse, train_PredFine, train_lossFine, summary_str = session.run(
+            _, log_labels, train_PredCoarse, train_PredFine, train_lossF, summary_str = session.run(
                 [model.train, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF,
                  summary_op], feed_dict=feed_dict_train)  # Training
             valid_PredCoarse, valid_PredFine, valid_lossF = session.run(
@@ -344,7 +334,7 @@ def train(args, params):
                 print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step,
                                                                                                             args.max_steps,
                                                                                                             end2 - start2,
-                                                                                                            train_lossFine,
+                                                                                                            train_lossF,
                                                                                                             valid_lossF))
 
         end = time.time()
@@ -373,7 +363,7 @@ def train(args, params):
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
-        f.write("%s\t\t%s\t\tsteps: %d\ttrain_lossFine: %f\n" % (datetime, appName, step, train_lossFine))
+        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\n" % (datetime, appName, args.dataset, step, train_lossF, valid_lossF)) # TODO: Nao salvar o appName, e sim o nome do model utilizado.
         f.close()
 
 
@@ -390,7 +380,6 @@ def test(args, params):
 
     # TODO: fazer rotina para pegar imagens externas, nao somente do dataset
     # Loads the dataset and restores a specified trained model.
-    args.data_path = '/media/olorin/Documentos/datasets/'  # FIXME: Pensar num metodo melhor de fazer isso
     dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
     model = ImportGraph(args.restore_path)
 
@@ -417,8 +406,6 @@ def test(args, params):
     # ==============
     start = time.time()
 
-
-
     for i, image_path in enumerate(dataloader.test_dataset):
         start2 = time.time()
 
@@ -437,6 +424,7 @@ def test(args, params):
         # Prints Testing Progress
         end2 = time.time()
         print('step: %d/%d | t: %f' % (i + 1, dataloader.numTestSamples, end2 - start2))
+        # break # Test
 
     # Testing Finished.
     end = time.time()
@@ -455,14 +443,21 @@ def test(args, params):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
-    np.save(output_directory + 'test_coarse_disparities.npy', predCoarse)
-    np.save(output_directory + 'test_fine_disparities.npy', predFine)
+    SAVE_TEST_DISPARITIES = False
+    if SAVE_TEST_DISPARITIES:
+        np.save(output_directory + 'test_coarse_disparities.npy', predCoarse)
+        np.save(output_directory + 'test_fine_disparities.npy', predFine)
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
         for i in range(dataloader.numTestSamples):
             def showTestResults(raw, label, coarse, fine):
                 plt.figure(1)
+                # print(raw.shape)
+                # print(label.shape)
+                # print(coarse.shape)
+                # print(fine.shape)
+
                 axes[0].set_title("Raw[%d]" % i)
                 axes[0].imshow(raw)
                 axes[1].set_title("Label")
@@ -474,6 +469,7 @@ def test(args, params):
 
                 plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
                 plt.pause(0.001)
+                # plt.show()
 
             showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i])
 
@@ -481,6 +477,7 @@ def test(args, params):
 #  Main
 # ======
 def main(args):
+    """ This Coarse-to-Fine Network Architecture predicts the log depth (log y)."""
     print("[%s] Running..." % appName)
 
     modelParams = {'inputSize': -1, 'outputSize': -1, 'model_name': args.model_name,

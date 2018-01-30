@@ -3,7 +3,7 @@
 # ===========
 import os
 
-from monodeep_model import *
+from utils.monodeep_model import *
 
 
 # ===================
