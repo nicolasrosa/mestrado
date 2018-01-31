@@ -525,10 +525,11 @@ class MonodepthDataloader(object):
             # Data Augmentation
             img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
 
+
+            # TODO: Implementar Random Crops, para ajudar
             # Crops Image
             img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
-            img_depth_crop = cropImage(img_depth_aug,
-                                       size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
+            img_depth_crop = cropImage(img_depth_aug, size=self.datasetObj.imageOutputSize)
 
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)

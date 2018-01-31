@@ -4,10 +4,8 @@
 # =======
 #  To-Do
 # =======
-# TODO: Adaptar o código para tambem funcionar com o tamanho do nyuDepth
 # TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
 # TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
-# FIXME: Arrumar dataset_preparation.py, kitti2012.pkl nao possui imagens de teste
 # FIXME: Apos uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
 
 # ===========
@@ -248,7 +246,7 @@ def train(args, params):
                 image, depth, image_crop, depth_crop = dataloader.readImage(batch_data_path[i],
                                                                             batch_labels_path[i],
                                                                             mode='train',
-                                                                            showImages=True)
+                                                                            showImages=False)
 
                 # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
 

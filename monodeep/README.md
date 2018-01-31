@@ -23,6 +23,7 @@ Ex:
     ./monodeep.py -m train -s kitti2012 --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s kitti2015 --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s kittiraw_campus --max_steps 1000 -t -d 0.5
+    ./monodeep.py -m train -s nyudepth --max_steps 100 -d 0.5 --ldecay
 
 # Testing/Restore
 Ex: 
