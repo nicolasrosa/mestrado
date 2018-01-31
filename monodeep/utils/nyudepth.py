@@ -3,7 +3,7 @@
 # ===================
 
 
-class datasetNyuDepth(object):
+class NyuDepth(object):
     def __init__(self, name, dataset_path):
         self.path = dataset_path
         self.name = name
@@ -15,4 +15,4 @@ class datasetNyuDepth(object):
         self.imageOutputSize = [228, 304]
         self.depthOutputSize = [57, 76]
 
-        print("[monodeep/Dataloader] datasetNyuDepth object created.")
+        print("[monodeep/Dataloader] NyuDepth object created.")

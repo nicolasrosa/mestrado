@@ -24,6 +24,7 @@ Ex:
     ./monodeep.py -m train -s kitti2015 --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s kittiraw_campus --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s nyudepth --max_steps 100 -d 0.5 --ldecay
+    ./monodeep.py -m train -s kittiraw_residential_continuous --max_steps 10 -d 0.5 --ldecay -t
 
 # Testing/Restore
 Ex: 
@@ -32,7 +33,8 @@ Ex:
     
     ./monodeep.py -m test -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t	(Deprecated)
     ./monodeep.py -m test -s kitti2012 -r output/monodeep/2018-01-27_14-20-07/restore/
-
+    ./monodeep.py -m test -s kittiraw_residential_continuous -r output/monodeep/2018-01-27_17-53-29/restore
+    
 # Dataset Prepation Script
 
 It's no longer necessary to generate dataset.pkl for training. The `monodeep_dataloader.py` identifies the images available for training and testing on-the-fly.

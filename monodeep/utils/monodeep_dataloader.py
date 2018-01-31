@@ -11,9 +11,10 @@ import glob
 from scipy import misc as scp
 from skimage import exposure
 from skimage import dtype_limits
+from skimage import transform
 
-from utils.kitti import *
-from utils.nyudepth import *
+from utils.kitti import Kitti
+from utils.nyudepth import NyuDepth
 
 
 # from temp.datasetAugmentation.dataset_preparation2 import *
@@ -75,14 +76,14 @@ def selectedDataset(DATASET_PATH_ROOT, dataset):
 
         # print(dataset_path)
         # input()
-        kitti = datasetKitti(dataset, dataset_path)
+        kitti = Kitti(dataset, dataset_path)
 
         return kitti, dataset_path
 
     elif dataset == 'nyudepth':
         dataset_path = DATASET_PATH_ROOT + '/nyu-depth-v2/images'
 
-        nyudepth = datasetNyuDepth(dataset, dataset_path)
+        nyudepth = NyuDepth(dataset, dataset_path)
 
         return nyudepth, dataset_path
 
@@ -286,14 +287,35 @@ def cropImage(img, x_min=None, x_max=None, y_min=None, y_max=None, size=None):
     return crop
 
 
-def downsampleImage(img, size):
+def resizeImage_bilinear(img, size):
     try:
         if size is None:
             raise ValueError
     except ValueError:
         print("[ValueError] Oops! Empty resizeSize list. Please sets the desired resizeSize.\n")
 
-    resized = scp.imresize(img, size, interp='bilinear')  # FIXME: ESSE METODO NAO MANTEM A ESCALA DE PROFUNDIDADE!!!
+    # TODO: Qual devo usar?
+    # resized = scp.imresize(img, size, interp='bilinear')  # Attention! This method doesn't maintain the original depth range!!!
+    # resized = transform.resize(image=img,output_shape=size, preserve_range=True, order=0)  # 0: Nearest - neighbor
+    resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=1) # 1: Bi - linear(default)
+    # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=2) # 2: Bi - quadratic
+    # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=3) # 3: Bi - cubic
+    # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=4) # 4: Bi - quartic
+    # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=5) # 5: Bi - quintic
+
+    # Debug
+    def debug():
+        print(img)
+        print(resized)
+        plt.figure()
+        plt.imshow(img)
+        plt.title("img")
+        plt.figure()
+        plt.imshow(resized)
+        plt.title("resized")
+        plt.show()
+
+    # debug()
 
     return resized
 
@@ -526,14 +548,14 @@ class MonodepthDataloader(object):
             img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
 
 
-            # TODO: Implementar Random Crops, para ajudar
+            # TODO: Implementar Random Crops,
             # Crops Image
             img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
             img_depth_crop = cropImage(img_depth_aug, size=self.datasetObj.imageOutputSize)
 
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
-            img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
+            img_depth_downsized = resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             # Results
             if showImages:
@@ -594,7 +616,7 @@ class MonodepthDataloader(object):
                     os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
-                img_depth_downsized = downsampleImage(img_depth_crop, size=self.datasetObj.depthOutputSize)
+                img_depth_downsized = resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             return img_colors_normed, img_depth_downsized, img_colors_crop
 

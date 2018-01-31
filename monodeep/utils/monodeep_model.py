@@ -6,6 +6,7 @@
 # ===========
 import numpy as np
 import tensorflow as tf
+import os
 
 # ==================
 #  Global Variables
@@ -357,3 +358,19 @@ class MonoDeepModel(object):
         for variable in tf.trainable_variables():
             total_num_parameters += np.array(variable.get_shape().as_list()).prod()
         print("[Network/Model] Number of trainable parameters: {}".format(total_num_parameters))
+
+    @staticmethod
+    def saveTrainedModel(save_path, session, saver, model_name):
+        """ Saves trained model """
+        # Creates saver obj which backups all the variables.
+        for i in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+            print(i)  # i.name if you want just a name
+
+        # train_saver = tf.train.Saver()                                                  # ~4.3 Gb
+        # train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))  # ~850 mb
+
+        file_path = saver.save(session, os.path.join(save_path,
+                                                           "model." + model_name + ".ckpt"))  # TODO: Acredito que seja possível remover .ckpt. Rodar networkTraining em modo 'test' e networkPredict_example.py para validar essa mudanca.
+
+        print("\n[Results] Model saved in file: %s" % file_path)
+

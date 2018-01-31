@@ -6,7 +6,8 @@
 # =======
 # TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
 # TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
-# FIXME: Apos uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
+# FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
+# TODO: Evitar ficar utilizando import *
 
 # ===========
 #  Libraries
@@ -20,6 +21,7 @@ from collections import deque
 
 from utils.importNetwork import *
 from utils.monodeep_dataloader import *
+from utils.plot import Plot, np_MSE
 
 # ==================
 #  Global Variables
@@ -79,15 +81,14 @@ def argumentHandler():
     parser.add_argument('-t', '--show_train_progress', action='store_true', help="Show Training Progress Images",
                         default=False)
 
+    parser.add_argument('-te','--show_train_error_progress', action='store_true', help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.", default=False)
+
     parser.add_argument('-o', '--output_directory', type=str,
                         help='output directory for test disparities, if empty outputs to checkpoint folder',
                         default='output/')
 
     # TODO: Adicionar acima
-    # parser.add_argument('-t','--showTrainingErrorProgress', action='store_true', dest='showTrainingErrorProgress', help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.", default=False)
-    # parser.add_argument('-v','--showValidationErrorProgress', action='store_true', dest='showValidationErrorProgress', help="Show the first validation example label, the Network predictions, and the MSE evaluations", default=False)
     # parser.add_argument('-u', '--showTestingProgress', action='store_true', dest='showTestingProgress', help="Show the first batch testing Network prediction img", default=False)
-    # parser.add_argument('-p', '--showPlots', action='store_true', dest='enablePlots', help="Allow the plots being displayed", default=False) # TODO: Correto seria falar o nome dos plots habilitados
     # parser.add_argument('-s', '--save', action='store_true', dest='enableSave', help="Save the trained model for later restoration.", default=False)
 
     # parser.add_argument('--saveValidFigs', action='store_true', dest='saveValidFigs', help="Save the figures from Validation Predictions.", default=False) # TODO: Add prefix char '-X'
@@ -113,32 +114,6 @@ def createSaveFolder():
             os.makedirs(save_restore_path)
 
     return save_path, save_restore_path
-
-
-def createPlotsObj(mode, title):
-    # Local Variables
-    fig, axes = None, None
-
-    if mode == 'train':
-        # TODO: Mover, Validar
-        fig, axes = plt.subplots(5, 1)
-        axes[0] = plt.subplot(321)
-        axes[1] = plt.subplot(323)
-        axes[2] = plt.subplot(325)
-        axes[3] = plt.subplot(322)
-        axes[4] = plt.subplot(324)
-
-    elif mode == 'test':
-        fig, axes = plt.subplots(4, 1)
-        axes[0] = plt.subplot(411)
-        axes[1] = plt.subplot(412)
-        axes[2] = plt.subplot(413)
-        axes[3] = plt.subplot(414)
-
-    fig = plt.gcf()
-    fig.canvas.set_window_title(title)
-
-    return fig, axes
 
 
 # ===================== #
@@ -221,7 +196,7 @@ def train(args, params):
         #  Training Loop
         # =================
         start = time.time()
-        fig, axes = createPlotsObj(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+        train_plotObj = Plot(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
         for i in range((len(dataloader.valid_dataset))):
             valid_dataset_o[i], valid_labels_o[i], _, _ = dataloader.readImage(dataloader.valid_dataset[i],
@@ -248,28 +223,12 @@ def train(args, params):
                                                                             mode='train',
                                                                             showImages=False)
 
-                # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
+                print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
+
 
                 batch_data[i] = image
                 batch_labels[i] = depth
                 batch_data_colors[i] = image_crop
-
-                def debugPlot():
-                    # plt.figure()
-                    # plt.imshow(image)
-                    # plt.figure()
-                    # plt.imshow(batch_data[i])
-                    # plt.figure()
-                    # plt.imshow(depth)
-                    # plt.figure()
-                    # plt.imshow(batch_labels[i])
-                    plt.figure()
-                    plt.imshow(image_crop)
-                    plt.figure()
-                    plt.imshow(batch_data_colors[i])
-                    plt.show()
-
-                # debugPlot()
 
             feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels,
                                model.tf_keep_prob: args.dropout}
@@ -315,27 +274,24 @@ def train(args, params):
 
             # Prints Training Progress
             if step % 10 == 0:
-                def plot1(raw, label, log_label, coarse, fine):
-                    axes[0].imshow(raw)
-                    axes[0].set_title("Raw")
-                    axes[1].imshow(label)
-                    axes[1].set_title("Label")
-                    axes[2].imshow(log_label)
-                    axes[2].set_title("log(Label)")
-                    axes[3].imshow(coarse)
-                    axes[3].set_title("Coarse")
-                    axes[4].imshow(fine)
-                    axes[4].set_title("Fine")
-                    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-
-                    plt.pause(0.001)
-
                 if args.show_train_progress:
-                    plot1(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :], log_label=log_labels[0, :, :],
-                          coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
+                    train_plotObj.plot_train(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],
+                                             log_label=log_labels[0, :, :],
+                                             coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
+
+                    # Plot.plotTrainingProgress(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],log_label=log_labels[0, :, :], coarse=train_PredCoarse[0, :, :],fine=train_PredFine[0, :, :], fig_id=3)
+
+
+                if args.show_train_error_progress:
+                    # Lembre que a Training Loss utilizaRMSE_log_scaleInv, porém o resultado é avaliado utilizando MSE
+                    train_MSE_c_img = np_MSE(y=train_PredCoarse[0, :, :], y_=batch_labels[0, :, :], )
+                    train_MSE_f_img = np_MSE(y=train_PredFine[0, :, :], y_=batch_labels[0, :, :])
+
+                    Plot.plotTrainingErrorProgress(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],
+                                                      coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :],
+                                                      coarseMSE=train_MSE_c_img, fineMSE=train_MSE_f_img, figId=8)
 
                 end2 = time.time()
-
                 print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step,
                                                                                                             args.max_steps,
                                                                                                             end2 - start2,
@@ -348,23 +304,8 @@ def train(args, params):
         # ==============
         #  Save Results
         # ==============
-        # TODO: Mover
-        def saveTrainedModel(save_path, session):
-            """ Saves trained model """
-            # Creates saver obj which backups all the variables.
-            for i in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
-                print(i)  # i.name if you want just a name
-
-            # train_saver = tf.train.Saver()                                                  # ~4.3 Gb
-            # train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))  # ~850 mb
-
-            file_path = train_saver.save(session, os.path.join(save_path,
-                                                               "model." + args.model_name + ".ckpt"))  # TODO: Acredito que seja possível remover .ckpt. Rodar networkTraining em modo 'test' e networkPredict_example.py para validar essa mudanca.
-
-            print("\n[Results] Model saved in file: %s" % file_path)
-
         if ENABLE_RESTORE:
-            saveTrainedModel(save_restore_path, session)
+            model.saveTrainedModel(save_restore_path, session, train_saver, args.model_name)
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
@@ -379,8 +320,7 @@ def train(args, params):
 # ========= #
 def test(args, params):
     # Local Variables
-    fig, axes = createPlotsObj(args.mode,
-                               title='Test Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+    test_plotObj = Plot(args.mode, title='Test Predictions') # TODO: Qual o melhor lugar para essa linhas?
 
     print('[%s] Selected mode: Test' % appName)
     print('[%s] Selected Params: %s' % (appName, args))
@@ -433,6 +373,35 @@ def test(args, params):
         print('step: %d/%d | t: %f' % (i + 1, dataloader.numTestSamples, end2 - start2))
         # break # Test
 
+        # TODO: Terminar implementacao Bilinear
+        # TODO: Mover funcao de lugar
+        def bilinearOutput(img, size):
+            resized = transform.resize(image=img, output_shape=size, preserve_range=True,
+                                   order=1)  # 1: Bi - linear(default)
+
+            # Debug
+            def debug():
+                print(img)
+                print(resized)
+                plt.figure()
+                plt.imshow(img)
+                plt.title("img")
+                plt.figure()
+                plt.imshow(resized)
+                plt.title("resized")
+                plt.show()
+
+            debug()
+
+        # bilinearOutput(img=predFine[i], size=dataloader.datasetObj.depthInputSize)
+        resizeImage_bilinear(img=test_dataset_crop_o[i], size=dataloader.datasetObj.imageInputSize)
+        # it's height, width in TF - not width, height
+        # new_height = int(round(old_height * scale))
+        # new_width = int(round(old_width * scale))
+        # resized = tf.image.resize_images(input_tensor, [new_height, new_width])
+
+        input("Continue")
+
     # Testing Finished.
     end = time.time()
     print("\n[Network/Testing] Testing FINISHED! Time elapsed: %f s" % (end - start))
@@ -457,27 +426,7 @@ def test(args, params):
     # Show Results
     if SHOW_TEST_DISPARITIES:
         for i in range(dataloader.numTestSamples):
-            def showTestResults(raw, label, coarse, fine):
-                plt.figure(1)
-                # print(raw.shape)
-                # print(label.shape)
-                # print(coarse.shape)
-                # print(fine.shape)
-
-                axes[0].set_title("Raw[%d]" % i)
-                axes[0].imshow(raw)
-                axes[1].set_title("Label")
-                axes[1].imshow(label)
-                axes[2].set_title("Coarse")
-                axes[2].imshow(coarse)
-                axes[3].set_title("Fine")
-                axes[3].imshow(fine)
-
-                plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-                plt.pause(0.001)
-                # plt.show()
-
-            showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i])
+            test_plotObj.showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
 
 
 # ======
