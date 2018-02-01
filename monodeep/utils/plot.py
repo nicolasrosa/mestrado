@@ -7,10 +7,7 @@ import numpy as np
 # ===========
 #  Functions
 # ===========
-def np_MSE(y, y_):
-    numPixels = y_.size
 
-    return np.power(y_ - y, 2) / numPixels  # MSE calculated for each pixel
 
 # ===================
 #  Class Declaration

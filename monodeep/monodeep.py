@@ -21,7 +21,8 @@ from collections import deque
 
 from utils.importNetwork import *
 from utils.monodeep_dataloader import *
-from utils.plot import Plot, np_MSE
+from utils.plot import Plot
+from utils.loss import Loss
 
 # ==================
 #  Global Variables
@@ -223,8 +224,7 @@ def train(args, params):
                                                                             mode='train',
                                                                             showImages=False)
 
-                print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
-
+                # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
 
                 batch_data[i] = image
                 batch_labels[i] = depth
@@ -373,34 +373,40 @@ def test(args, params):
         print('step: %d/%d | t: %f' % (i + 1, dataloader.numTestSamples, end2 - start2))
         # break # Test
 
-        # TODO: Terminar implementacao Bilinear
-        # TODO: Mover funcao de lugar
-        def bilinearOutput(img, size):
-            resized = transform.resize(image=img, output_shape=size, preserve_range=True,
-                                   order=1)  # 1: Bi - linear(default)
+        def devel():
+            # TODO: Terminar implementacao Bilinear
+            # bilinearOutput(img=predFine[i], size=dataloader.datasetObj.depthInputSize)
+            img = predFine[i]
 
-            # Debug
-            def debug():
-                print(img)
-                print(resized)
-                plt.figure()
-                plt.imshow(img)
-                plt.title("img")
-                plt.figure()
-                plt.imshow(resized)
-                plt.title("resized")
-                plt.show()
+            res_np_resized = np_resizeImage_bilinear(img=predFine[i], size=dataloader.datasetObj.imageInputSize)
 
-            debug()
+            graph = tf.Graph()
+            with graph.as_default():
+                tf_image = tf.placeholder(tf.float32, shape=(43, 144, 1), name='image')
+                tf_resized = tf.image.resize_images(tf_image, [376, 1241])
 
-        # bilinearOutput(img=predFine[i], size=dataloader.datasetObj.depthInputSize)
-        resizeImage_bilinear(img=test_dataset_crop_o[i], size=dataloader.datasetObj.imageInputSize)
-        # it's height, width in TF - not width, height
-        # new_height = int(round(old_height * scale))
-        # new_width = int(round(old_width * scale))
-        # resized = tf.image.resize_images(input_tensor, [new_height, new_width])
+            with tf.Session(graph=graph) as sess:
+                res_tf_resized = tf_resized.eval(feed_dict={tf_image: np.expand_dims(predFine[i],axis=2)})
 
-        input("Continue")
+                print(res_tf_resized.shape)
+
+            plt.figure(2)
+            plt.imshow(img)
+            plt.title('img')
+
+            plt.figure(3)
+            plt.imshow(res_np_resized)
+            plt.title('res_np_resized')
+
+            plt.figure(4)
+            plt.imshow(res_tf_resized[:,:,0])
+            plt.title('res_tf_resized')
+
+            plt.show()
+            input("Continue")
+
+        # devel() # TODO: Remover
+
 
     # Testing Finished.
     end = time.time()

@@ -287,7 +287,7 @@ def cropImage(img, x_min=None, x_max=None, y_min=None, y_max=None, size=None):
     return crop
 
 
-def resizeImage_bilinear(img, size):
+def np_resizeImage_bilinear(img, size):
     try:
         if size is None:
             raise ValueError
@@ -318,6 +318,36 @@ def resizeImage_bilinear(img, size):
     # debug()
 
     return resized
+
+# def tf_resizeImage_bilinear(img, size):
+#     try:
+#         if size is None:
+#             raise ValueError
+#     except ValueError:
+#         print("[ValueError] Oops! Empty resizeSize list. Please sets the desired resizeSize.\n")
+#
+#     # TODO: Terminar
+#     # it's height, width in TF - not width, height
+#     # new_height = int(round(old_height * scale))
+#     # new_width = int(round(old_width * scale))
+#     # resized = tf.image.resize_images(input_tensor, [new_height, new_width])
+#
+#
+#     # Debug
+#     def debug():
+#         print(img)
+#         print(resized)
+#         plt.figure()
+#         plt.imshow(img)
+#         plt.title("img")
+#         plt.figure()
+#         plt.imshow(resized)
+#         plt.title("resized")
+#         plt.show()
+#
+#     # debug()
+#
+#     return resized
 
 
 def normalizeImage(img):
@@ -555,7 +585,10 @@ class MonodepthDataloader(object):
 
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
-            img_depth_downsized = resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+
+            # FIXME: Dar fim na variavel downsized, quando o bilinear incorporado ao modelo ja estiver funcionando
+            img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+            # img_depth_downsized = img_depth_crop
 
             # Results
             if showImages:
@@ -616,7 +649,7 @@ class MonodepthDataloader(object):
                     os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
-                img_depth_downsized = resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+                img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             return img_colors_normed, img_depth_downsized, img_colors_crop
 
