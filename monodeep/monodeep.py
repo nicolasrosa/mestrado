@@ -178,20 +178,43 @@ def train(args, params):
         print('Train with approximately %d epochs' % epochs)
 
         # Memory Allocation
-        batch_data = np.zeros(
-            (args.batch_size, dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-            dtype=np.float64)
-        batch_labels = np.zeros(
-            (args.batch_size, dataloader.outputSize[1], dataloader.outputSize[2]), dtype=np.int32)
-        batch_data_colors = np.zeros(
-            (args.batch_size, dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-            dtype=np.uint8)
+        batch_data = np.zeros((args.batch_size,
+                               dataloader.inputSize[1],
+                               dataloader.inputSize[2],
+                               dataloader.inputSize[3]),
+                               dtype=np.float64) # (?, 172, 576, 3)
 
-        valid_dataset_o = np.zeros(
-            (len(dataloader.valid_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-            dtype=np.uint8)
-        valid_labels_o = np.zeros((len(dataloader.valid_labels), dataloader.outputSize[1], dataloader.outputSize[2]),
-                                  dtype=np.int32)
+        # batch_labels = np.zeros((args.batch_size,
+        #                          dataloader.outputSize[1],
+        #                          dataloader.outputSize[2]),
+        #                          dtype=np.int32) # (?, 43, 144)
+
+        batch_labels = np.zeros((args.batch_size,
+                                 dataloader.inputSize[1],
+                                 dataloader.inputSize[2]),
+                                 dtype=np.int32) # (?, 172, 576)
+
+        batch_data_crop = np.zeros((args.batch_size,
+                                      dataloader.inputSize[1],
+                                      dataloader.inputSize[2],
+                                      dataloader.inputSize[3]),
+                                      dtype=np.uint8) # (?, 172, 576, 3)
+
+        valid_dataset_o = np.zeros((len(dataloader.valid_dataset),
+                                    dataloader.inputSize[1],
+                                    dataloader.inputSize[2],
+                                    dataloader.inputSize[3]),
+                                    dtype=np.uint8) # (?, 172, 576, 3)
+
+        # valid_labels_o = np.zeros((len(dataloader.valid_labels),
+        #                            dataloader.outputSize[1],
+        #                            dataloader.outputSize[2]),
+        #                            dtype=np.int32) # (?, 43, 144)
+
+        valid_labels_o = np.zeros((len(dataloader.valid_labels),
+                                   dataloader.inputSize[1],
+                                   dataloader.inputSize[2]),
+                                   dtype=np.int32) # (?, 172, 576)
 
         # =================
         #  Training Loop
@@ -228,7 +251,7 @@ def train(args, params):
 
                 batch_data[i] = image
                 batch_labels[i] = depth
-                batch_data_colors[i] = image_crop
+                batch_data_crop[i] = image_crop
 
             feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels,
                                model.tf_keep_prob: args.dropout}
@@ -275,19 +298,19 @@ def train(args, params):
             # Prints Training Progress
             if step % 10 == 0:
                 if args.show_train_progress:
-                    train_plotObj.plot_train(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],
+                    train_plotObj.plot_train(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],
                                              log_label=log_labels[0, :, :],
                                              coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
 
-                    # Plot.plotTrainingProgress(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],log_label=log_labels[0, :, :], coarse=train_PredCoarse[0, :, :],fine=train_PredFine[0, :, :], fig_id=3)
+                    # Plot.plotTrainingProgress(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],log_label=log_labels[0, :, :], coarse=train_PredCoarse[0, :, :],fine=train_PredFine[0, :, :], fig_id=3)
 
 
                 if args.show_train_error_progress:
                     # Lembre que a Training Loss utilizaRMSE_log_scaleInv, porém o resultado é avaliado utilizando MSE
-                    train_MSE_c_img = np_MSE(y=train_PredCoarse[0, :, :], y_=batch_labels[0, :, :], )
-                    train_MSE_f_img = np_MSE(y=train_PredFine[0, :, :], y_=batch_labels[0, :, :])
+                    train_MSE_c_img = Loss.np_MSE(y=train_PredCoarse[0, :, :], y_=batch_labels[0, :, :], )
+                    train_MSE_f_img = Loss.np_MSE(y=train_PredFine[0, :, :], y_=batch_labels[0, :, :])
 
-                    Plot.plotTrainingErrorProgress(raw=batch_data_colors[0, :, :], label=batch_labels[0, :, :],
+                    Plot.plotTrainingErrorProgress(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],
                                                       coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :],
                                                       coarseMSE=train_MSE_c_img, fineMSE=train_MSE_f_img, figId=8)
 
@@ -331,22 +354,33 @@ def test(args, params):
     model = ImportGraph(args.restore_path)
 
     # Memory Allocation
-    predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                          dtype=np.float32)
-    predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                        dtype=np.float32)
+    # predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+    #                       dtype=np.float32) # (?, 43, 144)
+
+    predCoarse = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                          dtype=np.float32) # (?, 172, 576)
+
+    # predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+    #                     dtype=np.float32) # (?, 43, 144)
+
+    predFine = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                        dtype=np.float32) # (?, 172, 576)
+
 
     test_dataset_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-        dtype=np.uint8)
+        dtype=np.uint8) # (?, 172, 576, 3)
 
     # Length of test_dataset used, so when there is not test_labels, the variable will still be declared.
-    test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
-                             dtype=np.int32)
+    # test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
+    #                          dtype=np.int32) # (?, 43, 144)
+
+    test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
+                             dtype=np.int32)  # (?, 172, 576)
 
     test_dataset_crop_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-        dtype=np.uint8)
+        dtype=np.uint8) # (?, 172, 576, 3)
 
     # ==============
     #  Testing Loop
@@ -359,6 +393,8 @@ def test(args, params):
         if dataloader.test_labels:  # It's not empty
             image, depth, image_crop = dataloader.readImage(dataloader.test_dataset[i], dataloader.test_labels[i],
                                                             mode='test')
+
+            # print(image.shape, depth.shape, image_crop.shape)
             test_labels_o[i] = depth
         else:
             image, _, image_crop = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')

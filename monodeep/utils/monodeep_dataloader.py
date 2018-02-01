@@ -586,9 +586,8 @@ class MonodepthDataloader(object):
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
 
-            # FIXME: Dar fim na variavel downsized, quando o bilinear incorporado ao modelo ja estiver funcionando
-            img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
-            # img_depth_downsized = img_depth_crop
+            # img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+            img_depth_downsized = img_depth_crop # Copy
 
             # Results
             if showImages:
@@ -649,7 +648,9 @@ class MonodepthDataloader(object):
                     os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
-                img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+
+                # img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+                img_depth_downsized = img_depth_crop  # Copy
 
             return img_colors_normed, img_depth_downsized, img_colors_crop
 

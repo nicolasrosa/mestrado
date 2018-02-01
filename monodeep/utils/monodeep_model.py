@@ -161,11 +161,8 @@ class MonoDeepModel(object):
                                            shape=(None, self.image_height, self.image_width, self.image_nchannels),
                                            name='image')
 
-            # FIXME: Passar tamanho correto
-            self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width),
-                                            name='labels')
-            # self.tf_labels = tf.placeholder(tf.float32, shape=(None, 376, 1241),name='labels')
-
+            # self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width),name='labels') # (?, 43, 144)
+            self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.image_height, self.image_width),name='labels') # (?, 172, 576)
 
             self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
 
@@ -192,6 +189,7 @@ class MonoDeepModel(object):
             if self.params['model_name'] == 'monodeep':
                 self.createLayers_CoarseFine()
                 self.tf_predCoarse, self.tf_predFine = self.buildModel_CoarseFine(self.tf_image)
+
             else:
                 raise ValueError
         except ValueError:
@@ -265,12 +263,35 @@ class MonoDeepModel(object):
         self.fine.hidden3 = self.fine.conv3 + self.fine.bh3  # Linear
 
         # Apply Bilinear to Predictions Outputs for restoring Original Dataset size.
-        predFine = self.fine.hidden3[:, :, :, 0]
         predCoarse = self.coarse.fc2
+        predFine = tf.squeeze(self.fine.hidden3,axis=3) # self.fine.hidden3[:, :, :, 0]
+
+        # Debug
+        def debug():
+            print("Original")
+            print(predCoarse)
+            print(predFine)
+            print()
+            print("Coarse")
+            print(self.coarse.fc2)
+            print(tf.expand_dims(self.coarse.fc2, axis=3))
+            print(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]))
+            print(tf.squeeze(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]), axis=3))
+            print()
+            print("Fine")
+            print(self.fine.hidden3)
+            print(tf.squeeze(self.fine.hidden3, axis=3))
+            print(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]))
+            print(tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),axis=3) )
+
+            print(self.image_height, self.image_width)
+            input("model")
+
+        # debug()
 
         # Enable for applying resize
-        # predFine = tf.image.resize_images(predFine, [376, 1241]) # FIXME: Passar o tamanho correto
-        # predCoarse = tf.image.resize_images(predCoarse, [376, 1241]) # FIXME: Passar o tamanho correto
+        predCoarse = tf.squeeze(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]), axis=3) # (?, 172, 576)
+        predFine = tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),axis=3) # (?, 172, 576)
 
         return predCoarse, predFine
 
