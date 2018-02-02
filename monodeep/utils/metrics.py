@@ -34,9 +34,10 @@ def np_maskOutInvalidPixels(y, y_):
     y = np.reshape(y, [-1, y.shape[1] * y.shape[2]])
     y_ = np.reshape(y_, [-1, y_.shape[1] * y_.shape[2]])
 
+
+
     # Index Vectors for Valid Pixels
-    nvalids_idx_i = np.where(y_ > 0)[0]
-    nvalids_idx_j = np.where(y_ > 0)[1]
+    nvalids_idx_i, nvalids_idx_j = np.where(y_ > 0)
 
     # Check if masked y and y* have the same number of pixels
     assert (len(nvalids_idx_i) == len(nvalids_idx_j)), "Houston we've got a problem"
@@ -68,6 +69,10 @@ def np_Threshold(y, y_, thr):
     sigma = np.zeros(npixels_valid, dtype=np.float64)
     for i in range(npixels_valid):
         sigma[i] = max(y[i] / y_[i], y_[i] / y[i])
+
+    print(npixels_valid)
+    print(float(npixels_valid))
+    input("threshold")
 
     value = float(np.sum(sigma < thr)) / float(npixels_valid)
 

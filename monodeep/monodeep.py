@@ -5,6 +5,7 @@
 #  To-Do
 # =======
 # FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
+# TODO: Validar Métricas.
 
 # ===========
 #  Libraries
@@ -467,9 +468,11 @@ def test(args, params):
         np.save(output_directory + 'test_coarse_disparities.npy', predCoarse)
         np.save(output_directory + 'test_fine_disparities.npy', predFine)
 
-    # TODO: Terminar
     # Calculate Metrics
-    metrics.evaluateTesting(predFine, test_labels_o)
+    if dataloader.test_labels:
+        metrics.evaluateTesting(predFine, test_labels_o)
+    else:
+        print("[Network/Testing] It's not possible to calculate Metrics. There are no corresponding labels for Testing Predictions!")
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
