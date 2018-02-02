@@ -5,22 +5,24 @@
 #  To-Do
 # =======
 # TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
-# TODO: Adicionar funcao de custo do Eigen, pegar parte do calculo de gradientes da funcao de custo do monodepth
 # FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
-# TODO: Evitar ficar utilizando import *
 
 # ===========
 #  Libraries
 # ===========
 import argparse
+import tensorflow as tf
+import numpy as np
 import time
-# import numpy as np
-# import pprint
+import os
+import sys
+import utils.metrics as metrics
 
 from collections import deque
 
-from utils.importNetwork import *
-from utils.monodeep_dataloader import *
+from utils.monodeep_dataloader import MonodeepDataloader
+from utils.monodeep_model import MonodeepModel
+from utils.importNetwork import ImportGraph
 from utils.plot import Plot
 
 # ==================
@@ -35,7 +37,6 @@ datetime = time.strftime("%Y-%m-%d") + '_' + time.strftime("%H-%M-%S")
 ENABLE_EARLY_STOP = True
 ENABLE_RESTORE = True
 ENABLE_TENSORBOARD = True
-ENABLE_SAVE_CHECKPOINT = False
 SAVE_TEST_DISPARITIES = True
 SHOW_TEST_DISPARITIES = True
 APPLY_BILINEAR_ON_OUTPUT = False
@@ -139,11 +140,11 @@ def train(args, params):
     graph = tf.Graph()
     with graph.as_default():
         # MonoDepth
-        dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
+        dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode, APPLY_BILINEAR_ON_OUTPUT)
         params['inputSize'] = dataloader.inputSize
         params['outputSize'] = dataloader.outputSize
 
-        model = MonoDeepModel(args.mode, params)
+        model = MonodeepModel(args.mode, params, APPLY_BILINEAR_ON_OUTPUT)
 
         def test_dataAug():
             for i in range(10):
@@ -386,7 +387,7 @@ def test(args, params):
 
     # TODO: fazer rotina para pegar imagens externas, nao somente do dataset
     # Loads the dataset and restores a specified trained model.
-    dataloader = MonodepthDataloader(args.data_path, params, args.dataset, args.mode)
+    dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode,APPLY_BILINEAR_ON_OUTPUT)
     model = ImportGraph(args.restore_path)
 
     # Memory Allocation
@@ -466,6 +467,10 @@ def test(args, params):
     if SAVE_TEST_DISPARITIES:
         np.save(output_directory + 'test_coarse_disparities.npy', predCoarse)
         np.save(output_directory + 'test_fine_disparities.npy', predFine)
+
+    # TODO: Terminar
+    # Calculate Metrics
+    metrics.evaluateTesting()
 
     # Show Results
     if SHOW_TEST_DISPARITIES:

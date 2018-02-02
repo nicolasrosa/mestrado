@@ -2,9 +2,7 @@
 #  Libraries
 # ===========
 import matplotlib.pyplot as plt
-
-from utils.loss import Loss
-
+import utils.loss as loss
 
 # ==================
 #  Global Variables
@@ -18,7 +16,6 @@ class Plot(object):
         self.fig, self.axes = None, None
 
         if mode == 'train':
-            # TODO: Mover, Validar
             self.fig, self.axes = plt.subplots(5, 1)
             self.axes[0] = plt.subplot(321)
             self.axes[1] = plt.subplot(323)
@@ -144,8 +141,8 @@ class Plot(object):
     @staticmethod
     def plotTrainingErrorProgress(raw, label, coarse, fine, figId):
         # Lembre que a Training Loss utilizaRMSE_log_scaleInv, porém o resultado é avaliado utilizando MSE
-        coarseMSE = Loss.np_MSE(y=coarse, y_=label)
-        fineMSE = Loss.np_MSE(y=fine, y_=label)
+        coarseMSE = loss.np_MSE(y=coarse, y_=label)
+        fineMSE = loss.np_MSE(y=fine, y_=label)
 
         fig = plt.figure(figId)
         fig.clf()

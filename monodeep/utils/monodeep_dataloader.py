@@ -2,8 +2,8 @@
 #  Libraries
 # ===========
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
+import matplotlib.pyplot as plt
 import os
 import sys
 import glob
@@ -15,10 +15,6 @@ from skimage import transform
 
 from utils.kitti import Kitti
 from utils.nyudepth import NyuDepth
-import monodeep
-
-
-# from temp.datasetAugmentation.dataset_preparation2 import *
 
 # ==================
 #  Global Variables
@@ -380,11 +376,10 @@ def adjust_brightness(image, brightness):
 # ===================
 #  Class Declaration
 # ===================
-class MonodepthDataloader(object):
-    """monodepth dataloader"""
-
-    def __init__(self, data_path, params, dataset, mode, TRAIN_VALID_RATIO=0.8):
+class MonodeepDataloader(object):
+    def __init__(self, data_path, params, dataset, mode, applyBilinear, TRAIN_VALID_RATIO=0.8):
         # 80% for Training and 20% for Validation
+        self.applyBilinear = applyBilinear
 
         checkArgumentsIntegrity(dataset)
         print("\n[monodeep/Dataloader] Description: This script prepares the ", dataset,
@@ -588,7 +583,7 @@ class MonodepthDataloader(object):
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
 
-            if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+            if self.applyBilinear:
                 img_depth_downsized = img_depth_crop  # Copy
             else:
                 img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
@@ -653,7 +648,7 @@ class MonodepthDataloader(object):
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
 
-                if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+                if self.applyBilinear:
                     img_depth_downsized = img_depth_crop  # Copy
                 else:
                     img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)

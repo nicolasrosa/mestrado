@@ -4,9 +4,7 @@
 import numpy as np
 import tensorflow as tf
 import os
-
-from utils.loss import Loss
-import monodeep
+import utils.loss as loss
 
 # ==================
 #  Global Variables
@@ -115,12 +113,13 @@ class Fine(object):
         self.conc = None
 
 
-class MonoDeepModel(object):
-    def __init__(self, mode, params):
+class MonodeepModel(object):
+    def __init__(self, mode, params, applyBilinear):
         print(params)
 
         self.params = params
         self.mode = mode
+        self.applyBilinear = applyBilinear
 
         model_index = 0
         self.model_collection = ['model_' + str(model_index)]
@@ -162,7 +161,7 @@ class MonoDeepModel(object):
                                            shape=(None, self.image_height, self.image_width, self.image_nchannels),
                                            name='image')
 
-            if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+            if self.applyBilinear:
                 self.tf_labels = tf.placeholder(tf.float32,
                                                 shape=(None, self.image_height, self.image_width),
                                                 name='labels')  # (?, 172, 576)
@@ -299,7 +298,7 @@ class MonoDeepModel(object):
         # debug()
 
         # Enable for applying resize
-        if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+        if self.applyBilinear:
             predCoarse = tf.squeeze(
                 tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
                 axis=3)  # (?, 172, 576)
@@ -312,10 +311,10 @@ class MonoDeepModel(object):
     def build_losses(self):
         with tf.name_scope("Losses"):
             # Select Loss Function:
-            self.tf_lossF = Loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)  # Default
-            # self.tf_lossF = Loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)        # In Development, fix bug first
-            # self.tf_lossF = Loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
-            # self.tf_lossF = Loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # In Development, fix bug first
+            self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)  # Default
+            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)        # In Development, fix bug first
+            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
+            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # In Development, fix bug first
 
     def build_optimizer(self):
         with tf.name_scope("Optimizer"):

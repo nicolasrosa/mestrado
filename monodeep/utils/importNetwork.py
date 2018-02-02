@@ -1,7 +1,9 @@
 # ===========
 #  Libraries
 # ===========
-from utils.monodeep_model import *
+import numpy as np
+import tensorflow as tf
+import os
 
 
 # ===================
@@ -9,7 +11,6 @@ from utils.monodeep_model import *
 # ===================
 class ImportGraph(object):
     """  Importing and running isolated TF graph """
-
     def __init__(self, restore_path):
         # Local Variables
         restore_filepath = None
