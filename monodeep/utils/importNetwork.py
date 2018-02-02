@@ -1,8 +1,6 @@
 # ===========
 #  Libraries
 # ===========
-import os
-
 from utils.monodeep_model import *
 
 

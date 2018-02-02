@@ -6,6 +6,7 @@ import tensorflow as tf
 import os
 
 from utils.loss import Loss
+import monodeep
 
 # ==================
 #  Global Variables
@@ -161,8 +162,14 @@ class MonoDeepModel(object):
                                            shape=(None, self.image_height, self.image_width, self.image_nchannels),
                                            name='image')
 
-            # self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.depth_height, self.depth_width),name='labels') # (?, 43, 144)
-            self.tf_labels = tf.placeholder(tf.float32, shape=(None, self.image_height, self.image_width),name='labels') # (?, 172, 576)
+            if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+                self.tf_labels = tf.placeholder(tf.float32,
+                                                shape=(None, self.image_height, self.image_width),
+                                                name='labels')  # (?, 172, 576)
+            else:
+                self.tf_labels = tf.placeholder(tf.float32,
+                                                shape=(None, self.depth_height, self.depth_width),
+                                                name='labels')  # (?, 43, 144)
 
             self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
 
@@ -189,7 +196,6 @@ class MonoDeepModel(object):
             if self.params['model_name'] == 'monodeep':
                 self.createLayers_CoarseFine()
                 self.tf_predCoarse, self.tf_predFine = self.buildModel_CoarseFine(self.tf_image)
-
             else:
                 raise ValueError
         except ValueError:
@@ -264,7 +270,7 @@ class MonoDeepModel(object):
 
         # Apply Bilinear to Predictions Outputs for restoring Original Dataset size.
         predCoarse = self.coarse.fc2
-        predFine = tf.squeeze(self.fine.hidden3,axis=3) # self.fine.hidden3[:, :, :, 0]
+        predFine = tf.squeeze(self.fine.hidden3, axis=3)  # self.fine.hidden3[:, :, :, 0]
 
         # Debug
         def debug():
@@ -275,14 +281,17 @@ class MonoDeepModel(object):
             print("Coarse")
             print(self.coarse.fc2)
             print(tf.expand_dims(self.coarse.fc2, axis=3))
-            print(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]))
-            print(tf.squeeze(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]), axis=3))
+            print(
+                tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]))
+            print(tf.squeeze(
+                tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
+                axis=3))
             print()
             print("Fine")
             print(self.fine.hidden3)
             print(tf.squeeze(self.fine.hidden3, axis=3))
             print(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]))
-            print(tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),axis=3) )
+            print(tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]), axis=3))
 
             print(self.image_height, self.image_width)
             input("model")
@@ -290,8 +299,12 @@ class MonoDeepModel(object):
         # debug()
 
         # Enable for applying resize
-        predCoarse = tf.squeeze(tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]), axis=3) # (?, 172, 576)
-        predFine = tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),axis=3) # (?, 172, 576)
+        if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+            predCoarse = tf.squeeze(
+                tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
+                axis=3)  # (?, 172, 576)
+            predFine = tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),
+                                  axis=3)  # (?, 172, 576)
 
         return predCoarse, predFine
 
@@ -299,11 +312,10 @@ class MonoDeepModel(object):
     def build_losses(self):
         with tf.name_scope("Losses"):
             # Select Loss Function:
-            # self.tf_lossF = Loss.tf_MSE(self.tf_predFine, self.tf_log_labels)                            # Default
-            # self.tf_lossF = Loss.tf_MSE_old(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)
-            self.tf_lossF = Loss.tf_L(self.tf_predFine, self.tf_log_labels)
-            # self.tf_lossF = Loss.tf_L_old(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
-
+            self.tf_lossF = Loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)  # Default
+            # self.tf_lossF = Loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)        # In Development, fix bug first
+            # self.tf_lossF = Loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
+            # self.tf_lossF = Loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # In Development, fix bug first
 
     def build_optimizer(self):
         with tf.name_scope("Optimizer"):
@@ -340,7 +352,6 @@ class MonoDeepModel(object):
         # train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))  # ~850 mb
 
         file_path = saver.save(session, os.path.join(save_path,
-                                                           "model." + model_name + ".ckpt"))  # TODO: Acredito que seja possível remover .ckpt. Rodar networkTraining em modo 'test' e networkPredict_example.py para validar essa mudanca.
+                                                     "model." + model_name + ".ckpt"))  # TODO: Acredito que seja possível remover .ckpt. Rodar networkTraining em modo 'test' e networkPredict_example.py para validar essa mudanca.
 
         print("\n[Results] Model saved in file: %s" % file_path)
-

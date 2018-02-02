@@ -2,12 +2,13 @@
 #  Libraries
 # ===========
 import matplotlib.pyplot as plt
-import numpy as np
 
-# ===========
-#  Functions
-# ===========
+from utils.loss import Loss
 
+
+# ==================
+#  Global Variables
+# ==================
 
 # ===================
 #  Class Declaration
@@ -32,48 +33,55 @@ class Plot(object):
             self.axes[2] = plt.subplot(223)
             self.axes[3] = plt.subplot(224)
 
-        self.fig = plt.gcf() # TODO: Posso remover?
+        self.fig = plt.gcf()  # TODO: Posso remover?
         self.fig.canvas.set_window_title(title)
+        self.isFirstTime = True
 
     # TODO: Add ColorBar
-    def plot_train(self,raw, label, log_label, coarse, fine):
+    def showTrainResults(self, raw, label, log_label, coarse, fine):
+        plt.figure(1)
+
+        # Set Titles and subplots spacing. Runs only at first Time
+        if self.isFirstTime:
+            self.axes[0].set_title("Raw")
+            self.axes[1].set_title("Label")
+            self.axes[2].set_title("log(Label)")
+            self.axes[3].set_title("Coarse")
+            self.axes[4].set_title("Fine")
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+
+            self.isFirstTime = False
+
         self.axes[0].imshow(raw)
-        self.axes[0].set_title("Raw")
         cax1 = self.axes[1].imshow(label)
-        self.axes[1].set_title("Label")
         # self.fig.colorbar(cax1)
         cax2 = self.axes[2].imshow(log_label)
-        self.axes[2].set_title("log(Label)")
         # self.fig.colorbar(cax2)
         cax3 = self.axes[3].imshow(coarse)
-        self.axes[3].set_title("Coarse")
         # self.fig.colorbar(cax3)
         cax4 = self.axes[4].imshow(fine)
-        self.axes[4].set_title("Fine")
         # self.fig.colorbar(cax4)
-        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
         plt.pause(0.001)
 
-    def showTestResults(self,raw, label, coarse, fine, i):
+    def showTestResults(self, raw, label, coarse, fine, i):
         plt.figure(1)
-        # print(raw.shape)
-        # print(label.shape)
-        # print(coarse.shape)
-        # print(fine.shape)
 
-        self.axes[0].set_title("Raw")
-        self.axes[0].imshow(raw)
-        self.axes[1].set_title("Label")
-        self.axes[1].imshow(label)
-        self.axes[2].set_title("Coarse")
-        self.axes[2].imshow(coarse)
-        self.axes[3].set_title("Fine")
-        self.axes[3].imshow(fine)
-
-        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        # Set Titles and subplots spacing. Runs only at first Time
+        if self.isFirstTime:
+            self.axes[0].set_title("Raw")
+            self.axes[1].set_title("Label")
+            self.axes[2].set_title("Coarse")
+            self.axes[3].set_title("Fine")
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            self.isFirstTime = False
 
         self.fig.canvas.set_window_title("Test Predictions [%d]" % i)
+
+        self.axes[0].imshow(raw)
+        self.axes[1].imshow(label)
+        self.axes[2].imshow(coarse)
+        self.axes[3].imshow(fine)
 
         plt.pause(0.001)
 
@@ -111,7 +119,7 @@ class Plot(object):
 
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
-        fig = plt.gcf() # TODO: Posso remover?
+        fig = plt.gcf()  # TODO: Posso remover?
         fig.canvas.set_window_title("Train Predictions")
 
         plt.pause(0.001)
@@ -134,7 +142,11 @@ class Plot(object):
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
     @staticmethod
-    def plotTrainingErrorProgress(raw, label, coarse, fine, coarseMSE,fineMSE, figId):
+    def plotTrainingErrorProgress(raw, label, coarse, fine, figId):
+        # Lembre que a Training Loss utilizaRMSE_log_scaleInv, porém o resultado é avaliado utilizando MSE
+        coarseMSE = Loss.np_MSE(y=coarse, y_=label)
+        fineMSE = Loss.np_MSE(y=fine, y_=label)
+
         fig = plt.figure(figId)
         fig.clf()
 
@@ -171,7 +183,7 @@ class Plot(object):
 
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
-        fig = plt.gcf() # TODO: Posso remover?
+        fig = plt.gcf()  # TODO: Posso remover?
         fig.canvas.set_window_title("Train Predictions + MSE")
 
         plt.pause(0.001)

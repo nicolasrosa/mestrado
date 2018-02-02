@@ -22,13 +22,12 @@ from collections import deque
 from utils.importNetwork import *
 from utils.monodeep_dataloader import *
 from utils.plot import Plot
-from utils.loss import Loss
 
 # ==================
 #  Global Variables
 # ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 appName = 'monodeep'
 datetime = time.strftime("%Y-%m-%d") + '_' + time.strftime("%H-%M-%S")
@@ -39,6 +38,7 @@ ENABLE_TENSORBOARD = True
 ENABLE_SAVE_CHECKPOINT = False
 SAVE_TEST_DISPARITIES = True
 SHOW_TEST_DISPARITIES = True
+APPLY_BILINEAR_ON_OUTPUT = False
 
 # Early Stop Configuration
 AVG_SIZE = 20
@@ -82,7 +82,9 @@ def argumentHandler():
     parser.add_argument('-t', '--show_train_progress', action='store_true', help="Show Training Progress Images",
                         default=False)
 
-    parser.add_argument('-te','--show_train_error_progress', action='store_true', help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.", default=False)
+    parser.add_argument('-te', '--show_train_error_progress', action='store_true',
+                        help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.",
+                        default=False)
 
     parser.add_argument('-o', '--output_directory', type=str,
                         help='output directory for test disparities, if empty outputs to checkpoint folder',
@@ -182,45 +184,47 @@ def train(args, params):
                                dataloader.inputSize[1],
                                dataloader.inputSize[2],
                                dataloader.inputSize[3]),
-                               dtype=np.float64) # (?, 172, 576, 3)
-
-        # batch_labels = np.zeros((args.batch_size,
-        #                          dataloader.outputSize[1],
-        #                          dataloader.outputSize[2]),
-        #                          dtype=np.int32) # (?, 43, 144)
-
-        batch_labels = np.zeros((args.batch_size,
-                                 dataloader.inputSize[1],
-                                 dataloader.inputSize[2]),
-                                 dtype=np.int32) # (?, 172, 576)
+                              dtype=np.float64)  # (?, 172, 576, 3)
 
         batch_data_crop = np.zeros((args.batch_size,
-                                      dataloader.inputSize[1],
-                                      dataloader.inputSize[2],
-                                      dataloader.inputSize[3]),
-                                      dtype=np.uint8) # (?, 172, 576, 3)
+                                    dataloader.inputSize[1],
+                                    dataloader.inputSize[2],
+                                    dataloader.inputSize[3]),
+                                   dtype=np.uint8)  # (?, 172, 576, 3)
 
         valid_dataset_o = np.zeros((len(dataloader.valid_dataset),
                                     dataloader.inputSize[1],
                                     dataloader.inputSize[2],
                                     dataloader.inputSize[3]),
-                                    dtype=np.uint8) # (?, 172, 576, 3)
+                                   dtype=np.uint8)  # (?, 172, 576, 3)
 
-        # valid_labels_o = np.zeros((len(dataloader.valid_labels),
-        #                            dataloader.outputSize[1],
-        #                            dataloader.outputSize[2]),
-        #                            dtype=np.int32) # (?, 43, 144)
+        if APPLY_BILINEAR_ON_OUTPUT:
+            batch_labels = np.zeros((args.batch_size,
+                                     dataloader.inputSize[1],
+                                     dataloader.inputSize[2]),
+                                    dtype=np.int32)  # (?, 172, 576)
 
-        valid_labels_o = np.zeros((len(dataloader.valid_labels),
-                                   dataloader.inputSize[1],
-                                   dataloader.inputSize[2]),
-                                   dtype=np.int32) # (?, 172, 576)
+            valid_labels_o = np.zeros((len(dataloader.valid_labels),
+                                       dataloader.inputSize[1],
+                                       dataloader.inputSize[2]),
+                                      dtype=np.int32)  # (?, 172, 576)
+        else:
+            batch_labels = np.zeros((args.batch_size,
+                                     dataloader.outputSize[1],
+                                     dataloader.outputSize[2]),
+                                    dtype=np.int32)  # (?, 43, 144)
+
+            valid_labels_o = np.zeros((len(dataloader.valid_labels),
+                                       dataloader.outputSize[1],
+                                       dataloader.outputSize[2]),
+                                      dtype=np.int32)  # (?, 43, 144)
 
         # =================
         #  Training Loop
         # =================
         start = time.time()
-        train_plotObj = Plot(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+        if args.show_train_progress:
+            train_plotObj = Plot(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
         for i in range((len(dataloader.valid_dataset))):
             valid_dataset_o[i], valid_labels_o[i], _, _ = dataloader.readImage(dataloader.valid_dataset[i],
@@ -258,6 +262,42 @@ def train(args, params):
 
             feed_dict_valid = {model.tf_image: valid_dataset_o, model.tf_labels: valid_labels_o,
                                model.tf_keep_prob: 1.0}
+
+            # TODO: Remover depois do maskout estiver funcionand
+            def devel():
+                # Variables
+                # y = model.tf_predFine
+                # y_ = model.tf_log_labels
+                # tf_y = tf.contrib.layers.flatten(y)  # Tensor 'y'  (batchSize, height*width)
+                # tf_y_ = tf.contrib.layers.flatten(y_)  # Tensor 'y_' (batchSize, height*width)
+                # tf_c_y_ = tf_y_ > 0  # Tensor of Conditions (bool)
+                # tf_idx = tf.where(tf_c_y_)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
+                # tf_valid_y = tf.gather(tf_y, tf_idx)
+                # tf_valid_y_ = tf.gather(tf_y_, tf_idx)
+                # tf_npixels_valid = tf.shape(tf_valid_y_)
+                # tf_npixels_valid_float32 = tf.cast(tf_npixels_valid, tf.float32)
+
+                # Light Version
+                tf_y = tf.contrib.layers.flatten(model.tf_predFine)  # Tensor 'y'  (batchSize, height*width)
+                tf_y_ = tf.contrib.layers.flatten(model.tf_log_labels)  # Tensor 'y_' (batchSize, height*width)
+                tf_valid_y = tf.gather(tf_y, tf.where(tf_y_ > 0))
+                tf_valid_y_ = tf.gather(tf_y_, tf.where(tf_y_ > 0))
+                tf_npixels_valid = tf.shape(tf_valid_y_)
+                tf_npixels_valid_float32 = tf.cast(tf_npixels_valid, tf.float32)
+
+                # print(tf_y.eval(feed_dict=feed_dict_train))
+                # print(tf_y.eval(feed_dict=feed_dict_train).shape)
+                print(tf_y_.eval(feed_dict=feed_dict_train))
+                print(tf_y_.eval(feed_dict=feed_dict_train).shape)
+                # print(tf_idx.eval(feed_dict=feed_dict_train))
+                # print(tf_idx.eval(feed_dict=feed_dict_train).shape)
+                print(tf_valid_y.eval(feed_dict=feed_dict_train))
+                print(tf_valid_y.eval(feed_dict=feed_dict_train).shape)
+                # print(tf_valid_y_.eval(feed_dict=feed_dict_train))
+                # print(tf_valid_y_.eval(feed_dict=feed_dict_train).shape)
+                input("mask2")
+
+            # devel() # TODO: Remover
 
             # ----- Session Run! ----- #
             _, log_labels, train_PredCoarse, train_PredFine, train_lossF, summary_str = session.run(
@@ -298,21 +338,16 @@ def train(args, params):
             # Prints Training Progress
             if step % 10 == 0:
                 if args.show_train_progress:
-                    train_plotObj.plot_train(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],
-                                             log_label=log_labels[0, :, :],
-                                             coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
+                    train_plotObj.showTrainResults(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],
+                                                   log_label=log_labels[0, :, :],
+                                                   coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :])
 
                     # Plot.plotTrainingProgress(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],log_label=log_labels[0, :, :], coarse=train_PredCoarse[0, :, :],fine=train_PredFine[0, :, :], fig_id=3)
 
-
                 if args.show_train_error_progress:
-                    # Lembre que a Training Loss utilizaRMSE_log_scaleInv, porém o resultado é avaliado utilizando MSE
-                    train_MSE_c_img = Loss.np_MSE(y=train_PredCoarse[0, :, :], y_=batch_labels[0, :, :], )
-                    train_MSE_f_img = Loss.np_MSE(y=train_PredFine[0, :, :], y_=batch_labels[0, :, :])
-
                     Plot.plotTrainingErrorProgress(raw=batch_data_crop[0, :, :], label=batch_labels[0, :, :],
-                                                      coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :],
-                                                      coarseMSE=train_MSE_c_img, fineMSE=train_MSE_f_img, figId=8)
+                                                   coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :],
+                                                   figId=8)
 
                 end2 = time.time()
                 print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step,
@@ -343,7 +378,8 @@ def train(args, params):
 # ========= #
 def test(args, params):
     # Local Variables
-    test_plotObj = Plot(args.mode, title='Test Predictions') # TODO: Qual o melhor lugar para essa linhas?
+    if SHOW_TEST_DISPARITIES:
+        test_plotObj = Plot(args.mode, title='Test Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
     print('[%s] Selected mode: Test' % appName)
     print('[%s] Selected Params: %s' % (appName, args))
@@ -354,33 +390,34 @@ def test(args, params):
     model = ImportGraph(args.restore_path)
 
     # Memory Allocation
-    # predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-    #                       dtype=np.float32) # (?, 43, 144)
+    # Length of test_dataset used, so when there is not test_labels, the variable will still be declared.
 
-    predCoarse = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                          dtype=np.float32) # (?, 172, 576)
+    if APPLY_BILINEAR_ON_OUTPUT:
+        predCoarse = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                              dtype=np.float32)  # (?, 172, 576)
 
-    # predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-    #                     dtype=np.float32) # (?, 43, 144)
+        predFine = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                            dtype=np.float32)  # (?, 172, 576)
 
-    predFine = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                        dtype=np.float32) # (?, 172, 576)
+        test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
+                                 dtype=np.int32)  # (?, 172, 576)
+    else:
+        predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+                              dtype=np.float32)  # (?, 43, 144)
 
+        predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+                            dtype=np.float32)  # (?, 43, 144)
+
+        test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
+                                 dtype=np.int32)  # (?, 43, 144)
 
     test_dataset_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-        dtype=np.uint8) # (?, 172, 576, 3)
-
-    # Length of test_dataset used, so when there is not test_labels, the variable will still be declared.
-    # test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
-    #                          dtype=np.int32) # (?, 43, 144)
-
-    test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
-                             dtype=np.int32)  # (?, 172, 576)
+        dtype=np.uint8)  # (?, 172, 576, 3)
 
     test_dataset_crop_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
-        dtype=np.uint8) # (?, 172, 576, 3)
+        dtype=np.uint8)  # (?, 172, 576, 3)
 
     # ==============
     #  Testing Loop
@@ -408,41 +445,6 @@ def test(args, params):
         end2 = time.time()
         print('step: %d/%d | t: %f' % (i + 1, dataloader.numTestSamples, end2 - start2))
         # break # Test
-
-        def devel():
-            # TODO: Terminar implementacao Bilinear
-            # bilinearOutput(img=predFine[i], size=dataloader.datasetObj.depthInputSize)
-            img = predFine[i]
-
-            res_np_resized = np_resizeImage_bilinear(img=predFine[i], size=dataloader.datasetObj.imageInputSize)
-
-            graph = tf.Graph()
-            with graph.as_default():
-                tf_image = tf.placeholder(tf.float32, shape=(43, 144, 1), name='image')
-                tf_resized = tf.image.resize_images(tf_image, [376, 1241])
-
-            with tf.Session(graph=graph) as sess:
-                res_tf_resized = tf_resized.eval(feed_dict={tf_image: np.expand_dims(predFine[i],axis=2)})
-
-                print(res_tf_resized.shape)
-
-            plt.figure(2)
-            plt.imshow(img)
-            plt.title('img')
-
-            plt.figure(3)
-            plt.imshow(res_np_resized)
-            plt.title('res_np_resized')
-
-            plt.figure(4)
-            plt.imshow(res_tf_resized[:,:,0])
-            plt.title('res_tf_resized')
-
-            plt.show()
-            input("Continue")
-
-        # devel() # TODO: Remover
-
 
     # Testing Finished.
     end = time.time()

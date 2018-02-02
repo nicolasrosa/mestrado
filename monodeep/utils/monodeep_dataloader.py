@@ -15,6 +15,7 @@ from skimage import transform
 
 from utils.kitti import Kitti
 from utils.nyudepth import NyuDepth
+import monodeep
 
 
 # from temp.datasetAugmentation.dataset_preparation2 import *
@@ -297,7 +298,8 @@ def np_resizeImage_bilinear(img, size):
     # TODO: Qual devo usar?
     # resized = scp.imresize(img, size, interp='bilinear')  # Attention! This method doesn't maintain the original depth range!!!
     # resized = transform.resize(image=img,output_shape=size, preserve_range=True, order=0)  # 0: Nearest - neighbor
-    resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=1) # 1: Bi - linear(default)
+    resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=1)  # 1: Bi - linear(default)
+
     # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=2) # 2: Bi - quadratic
     # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=3) # 3: Bi - cubic
     # resized = transform.resize(image=img, output_shape=size, preserve_range=True, order=4) # 4: Bi - quartic
@@ -318,6 +320,7 @@ def np_resizeImage_bilinear(img, size):
     # debug()
 
     return resized
+
 
 # def tf_resizeImage_bilinear(img, size):
 #     try:
@@ -577,7 +580,6 @@ class MonodepthDataloader(object):
             # Data Augmentation
             img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
 
-
             # TODO: Implementar Random Crops,
             # Crops Image
             img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
@@ -586,8 +588,10 @@ class MonodepthDataloader(object):
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
 
-            # img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
-            img_depth_downsized = img_depth_crop # Copy
+            if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+                img_depth_downsized = img_depth_crop  # Copy
+            else:
+                img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             # Results
             if showImages:
@@ -649,8 +653,10 @@ class MonodepthDataloader(object):
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
 
-                # img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
-                img_depth_downsized = img_depth_crop  # Copy
+                if monodeep.APPLY_BILINEAR_ON_OUTPUT:
+                    img_depth_downsized = img_depth_crop  # Copy
+                else:
+                    img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
 
             return img_colors_normed, img_depth_downsized, img_colors_crop
 
