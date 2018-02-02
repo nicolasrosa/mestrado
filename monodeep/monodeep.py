@@ -4,7 +4,6 @@
 # =======
 #  To-Do
 # =======
-# TODO: Adicionar metricas (T is the total number of pixels in all the evaluated images)
 # FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
 
 # ===========
@@ -470,7 +469,7 @@ def test(args, params):
 
     # TODO: Terminar
     # Calculate Metrics
-    metrics.evaluateTesting()
+    metrics.evaluateTesting(predFine, test_labels_o)
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
