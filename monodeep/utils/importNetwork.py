@@ -24,7 +24,6 @@ class ImportGraph(object):
             # print(file)
             # print(file.find("model"))
             if not file.find("model"):
-                model_name = file.split(".")[1]  # '*.ckpt.meta' file
                 model_fileName = os.path.splitext(file)[0]
                 restore_filepath = restore_path + model_fileName  # Path to file with extension *.ckpt
                 break

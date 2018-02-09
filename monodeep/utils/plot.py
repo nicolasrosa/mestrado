@@ -4,6 +4,7 @@
 import matplotlib.pyplot as plt
 import utils.loss as loss
 
+
 # ==================
 #  Global Variables
 # ==================

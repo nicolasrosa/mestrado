@@ -250,9 +250,6 @@ class MonodeepModel(object):
         self.coarse.fc2 = tf.reshape(self.coarse.hidden7, [-1, self.depth_height, self.depth_width])
 
         # Network Layers - Fine
-        image_shape = image.get_shape().as_list()
-        predCoarse_shape = self.coarse.fc2.get_shape().as_list()
-
         self.fine.conv1 = tf.nn.conv2d(image, filter=self.fine.Wh1, strides=[1, 2, 2, 1], padding='SAME')
         self.fine.hidden1 = tf.nn.relu(self.fine.conv1 + self.fine.bh1)
         self.fine.pool1 = tf.nn.max_pool(self.fine.hidden1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
@@ -307,14 +304,14 @@ class MonodeepModel(object):
 
         return predCoarse, predFine
 
-    # TODO: Utilizar a tf_mse do stereoCNN e adicionar L2Norm
+    # TODO: adicionar L2Norm
     def build_losses(self):
         with tf.name_scope("Losses"):
             # Select Loss Function:
-            self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)  # Default
-            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)        # In Development, fix bug first
+            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)
+            self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
             # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
-            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # In Development, fix bug first
+            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # FIXME:
 
     def build_optimizer(self):
         with tf.name_scope("Optimizer"):

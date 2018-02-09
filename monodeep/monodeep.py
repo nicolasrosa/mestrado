@@ -10,13 +10,13 @@
 # ===========
 #  Libraries
 # ===========
-import argparse
 import tensorflow as tf
 import numpy as np
 import time
 import os
 import sys
 import utils.metrics as metrics
+import utils.args as args
 
 from collections import deque
 
@@ -29,7 +29,6 @@ from utils.plot import Plot
 #  Global Variables
 # ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 appName = 'monodeep'
 datetime = time.strftime("%Y-%m-%d") + '_' + time.strftime("%H-%M-%S")
@@ -39,7 +38,7 @@ ENABLE_RESTORE = True
 ENABLE_TENSORBOARD = True
 SAVE_TEST_DISPARITIES = True
 SHOW_TEST_DISPARITIES = True
-APPLY_BILINEAR_ON_OUTPUT = False
+APPLY_BILINEAR_ON_OUTPUT = False  # FIXME: Will not work if onlyValidPixels is True
 
 # Early Stop Configuration
 AVG_SIZE = 20
@@ -50,60 +49,6 @@ MAX_STEPS_AFTER_STABILIZATION = 10000
 # ===========
 #  Functions
 # ===========
-def argumentHandler():
-    # Creating Arguments Parser
-    parser = argparse.ArgumentParser("Train the Bitnet Tensorflow implementation taking the dataset.pkl file as input.")
-
-    # Input
-    parser.add_argument('-m', '--mode', type=str, help="Select 'train' or 'test' mode", default='train')
-    parser.add_argument('--model_name', type=str, help="Select Network topology: 'monodeep', etc",
-                        default='monodeep')  # TODO: Adicionar mais topologias
-    # parser.add_argument(    '--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg')
-    parser.add_argument('-i', '--data_path', type=str,
-                        help="Set relative path to the input dataset <filename>.pkl file",
-                        default='/media/olorin/Documentos/datasets/')
-
-    parser.add_argument('-s', '--dataset', action='store', dest='dataset',
-                        help="Selects the dataset ['kitti2012','kitti2015','nyudepth',kittiraw]", required=True)
-
-    parser.add_argument('--batch_size', type=int, help="Define the Training batch size", default=16)
-    parser.add_argument('--max_steps', type=int, help="Define the number of max Steps", default=1000)
-    parser.add_argument('-l', '--learning_rate', type=float, help="Define the initial learning rate", default=1e-4)
-    parser.add_argument('-d', '--dropout', type=float, help="Enable dropout in the model during training", default=0.5)
-    parser.add_argument('--ldecay', action='store_true', help="Enable learning decay", default=False)
-    parser.add_argument('-n', '--l2norm', action='store_true', help="Enable L2 Normalization", default=False)
-
-    parser.add_argument('--full_summary', action='store_true',
-                        help="If set, will keep more data for each summary. Warning: the file can become very large")
-
-    parser.add_argument('--log_directory', type=str, help="Set directory to save checkpoints and summaries",
-                        default='log_tb/')
-    parser.add_argument('-r', '--restore_path', type=str, help="Set path to a specific restore to load", default='')
-
-    parser.add_argument('-t', '--show_train_progress', action='store_true', help="Show Training Progress Images",
-                        default=False)
-
-    parser.add_argument('-te', '--show_train_error_progress', action='store_true',
-                        help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.",
-                        default=False)
-
-    parser.add_argument('-o', '--output_directory', type=str,
-                        help='output directory for test disparities, if empty outputs to checkpoint folder',
-                        default='output/')
-
-    # TODO: Adicionar acima
-    # parser.add_argument('-u', '--showTestingProgress', action='store_true', dest='showTestingProgress', help="Show the first batch testing Network prediction img", default=False)
-    # parser.add_argument('-s', '--save', action='store_true', dest='enableSave', help="Save the trained model for later restoration.", default=False)
-
-    # parser.add_argument('--saveValidFigs', action='store_true', dest='saveValidFigs', help="Save the figures from Validation Predictions.", default=False) # TODO: Add prefix char '-X'
-    # parser.add_argument('--saveTestPlots', action='store_true', dest='saveTestPlots', help="Save the Plots from Testing Predictions.", default=False)   # TODO: Add prefix char '-X'
-    # parser.add_argument('--saveTestFigs', action='store_true', dest='saveTestFigs', help="Save the figures from Testing Predictions", default=False)    # TODO: Add prefix char '-X'
-
-    # parser.add_argument('--retrain', help='if used with restore_path, will restart training from step zero', action='store_true')
-
-    return parser.parse_args()
-
-
 def createSaveFolder():
     save_path = None
     save_restore_path = None
@@ -176,8 +121,7 @@ def train(args, params):
         print("[Network/Training] Training Initialized!\n")
 
         # Proclaim the epochs
-        epochs = np.floor(
-            args.batch_size * args.max_steps / dataloader.numTrainSamples)
+        epochs = np.floor(args.batch_size * args.max_steps / dataloader.numTrainSamples)
         print('Train with approximately %d epochs' % epochs)
 
         # Memory Allocation
@@ -264,42 +208,6 @@ def train(args, params):
             feed_dict_valid = {model.tf_image: valid_dataset_o, model.tf_labels: valid_labels_o,
                                model.tf_keep_prob: 1.0}
 
-            # TODO: Remover depois do maskout estiver funcionand
-            def devel():
-                # Variables
-                # y = model.tf_predFine
-                # y_ = model.tf_log_labels
-                # tf_y = tf.contrib.layers.flatten(y)  # Tensor 'y'  (batchSize, height*width)
-                # tf_y_ = tf.contrib.layers.flatten(y_)  # Tensor 'y_' (batchSize, height*width)
-                # tf_c_y_ = tf_y_ > 0  # Tensor of Conditions (bool)
-                # tf_idx = tf.where(tf_c_y_)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
-                # tf_valid_y = tf.gather(tf_y, tf_idx)
-                # tf_valid_y_ = tf.gather(tf_y_, tf_idx)
-                # tf_npixels_valid = tf.shape(tf_valid_y_)
-                # tf_npixels_valid_float32 = tf.cast(tf_npixels_valid, tf.float32)
-
-                # Light Version
-                tf_y = tf.contrib.layers.flatten(model.tf_predFine)  # Tensor 'y'  (batchSize, height*width)
-                tf_y_ = tf.contrib.layers.flatten(model.tf_log_labels)  # Tensor 'y_' (batchSize, height*width)
-                tf_valid_y = tf.gather(tf_y, tf.where(tf_y_ > 0))
-                tf_valid_y_ = tf.gather(tf_y_, tf.where(tf_y_ > 0))
-                tf_npixels_valid = tf.shape(tf_valid_y_)
-                tf_npixels_valid_float32 = tf.cast(tf_npixels_valid, tf.float32)
-
-                # print(tf_y.eval(feed_dict=feed_dict_train))
-                # print(tf_y.eval(feed_dict=feed_dict_train).shape)
-                print(tf_y_.eval(feed_dict=feed_dict_train))
-                print(tf_y_.eval(feed_dict=feed_dict_train).shape)
-                # print(tf_idx.eval(feed_dict=feed_dict_train))
-                # print(tf_idx.eval(feed_dict=feed_dict_train).shape)
-                print(tf_valid_y.eval(feed_dict=feed_dict_train))
-                print(tf_valid_y.eval(feed_dict=feed_dict_train).shape)
-                # print(tf_valid_y_.eval(feed_dict=feed_dict_train))
-                # print(tf_valid_y_.eval(feed_dict=feed_dict_train).shape)
-                input("mask2")
-
-            # devel() # TODO: Remover
-
             # ----- Session Run! ----- #
             _, log_labels, train_PredCoarse, train_PredFine, train_lossF, summary_str = session.run(
                 [model.train, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF,
@@ -358,7 +266,8 @@ def train(args, params):
                                                                                                             valid_lossF))
 
         end = time.time()
-        print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % (end - start))
+        sim_train = end - start
+        print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % sim_train)
 
         # ==============
         #  Save Results
@@ -368,9 +277,9 @@ def train(args, params):
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
-        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\n" % (
+        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\t%f\n" % (
             datetime, appName, args.dataset, step, train_lossF,
-            valid_lossF))  # TODO: Nao salvar o appName, e sim o nome do model utilizado.
+            valid_lossF, sim_train))  # TODO: Nao salvar o appName, e sim o nome do model utilizado.
         f.close()
 
 
@@ -387,7 +296,7 @@ def test(args, params):
 
     # TODO: fazer rotina para pegar imagens externas, nao somente do dataset
     # Loads the dataset and restores a specified trained model.
-    dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode,APPLY_BILINEAR_ON_OUTPUT)
+    dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode, APPLY_BILINEAR_ON_OUTPUT)
     model = ImportGraph(args.restore_path)
 
     # Memory Allocation
@@ -472,7 +381,8 @@ def test(args, params):
     if dataloader.test_labels:
         metrics.evaluateTesting(predFine, test_labels_o)
     else:
-        print("[Network/Testing] It's not possible to calculate Metrics. There are no corresponding labels for Testing Predictions!")
+        print(
+            "[Network/Testing] It's not possible to calculate Metrics. There are no corresponding labels for Testing Predictions!")
 
     # Show Results
     if SHOW_TEST_DISPARITIES:
@@ -484,6 +394,8 @@ def test(args, params):
 #  Main
 # ======
 def main(args):
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+
     """ This Coarse-to-Fine Network Architecture predicts the log depth (log y)."""
     print("[%s] Running..." % appName)
 
@@ -505,5 +417,5 @@ def main(args):
 #  Main
 # ======
 if __name__ == '__main__':
-    args = argumentHandler()
+    args = args.argumentHandler()
     tf.app.run(main=main(args))

@@ -1,4 +1,5 @@
-# Metrics presented by David Eigen, Christian Puhrsch and Rob Fergus in the article "Depth Map Prediction from a Single Image using a Multi-Scale Deep Network"
+# Metrics presented by David Eigen, Christian Puhrsch and Rob Fergus in the article "Depth Map Prediction from a Single
+# Image using a Multi-Scale Deep Network"
 # ===========
 #  Libraries
 # ===========
@@ -33,8 +34,6 @@ def np_maskOutInvalidPixels(y, y_):
     # Flattens Images (batchSize, height*width)
     y = np.reshape(y, [-1, y.shape[1] * y.shape[2]])
     y_ = np.reshape(y_, [-1, y_.shape[1] * y_.shape[2]])
-
-
 
     # Index Vectors for Valid Pixels
     nvalids_idx_i, nvalids_idx_j = np.where(y_ > 0)

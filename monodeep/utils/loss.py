@@ -48,30 +48,22 @@ def np_maskOutInvalidPixels(y, y_):
     return y_masked
 
 
-# FIXME: Não funciona,  ResourceExhaustedError (Pegando muita Memória)
-def tf_maskOutInvalidPixels(y, y_):
+# FIXME: Não funciona, junto com o Bilinear  ResourceExhaustedError (Pegando muita Memória)
+def tf_maskOutInvalidPixels(tf_y, tf_y_):
+    # Values Range
+    # NyuDepth - ]0, ~4000]
+    # Kitti 2012/2015 - [0, ~30000]
+    # Kittiraw Continuous (Vitor) - [0, 255]
+
     # Variables
-    tf_y = tf.contrib.layers.flatten(y)  # Tensor 'y'  (batchSize, height*width)
-    tf_y_ = tf.contrib.layers.flatten(y_)  # Tensor 'y_' (batchSize, height*width)
-    tf_c_y_ = tf_y_ > 0  # Tensor of Conditions (bool)
-    tf_idx = tf.where(tf_c_y_)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
+    tf_y = tf.contrib.layers.flatten(tf_y)  # (batchSize, height*width)
+    tf_y_ = tf.contrib.layers.flatten(tf_y_)  # (batchSize, height*width)
+    tf_idx = tf.where(tf_y_ > 0)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
+    tf_valid_y = tf.gather_nd(tf_y, tf_idx)
+    tf_valid_y_ = tf.gather_nd(tf_y_, tf_idx)
+    tf_npixels_valid = tf.cast(tf.shape(tf_valid_y_), tf.float32)
 
-    tf_valid_y = tf.gather(tf_y, tf_idx)
-    tf_valid_y_ = tf.gather(tf_y_, tf_idx)
-    tf_npixels_valid = tf.shape(tf_valid_y_)
-    tf_npixels_valid_float32 = tf.cast(tf_npixels_valid, tf.float32)
-
-    # print(tf_y)
-    # print(tf_y_)
-    # print(tf_c_y_)
-    # print(tf_idx)
-    print(tf_valid_y)
-    print(tf_valid_y_)
-    print(tf_npixels_valid)
-    print(tf_npixels_valid_float32)
-    input("mask")
-
-    return tf_valid_y, tf_valid_y_, tf_npixels_valid_float32
+    return tf_valid_y, tf_valid_y_, tf_npixels_valid
 
 
 # -------------------- #
@@ -83,20 +75,17 @@ def np_MSE(y, y_):
     return np.power(y_ - y, 2) / numPixels  # MSE calculated for each pixel
 
 
-def tf_MSE(y, y_, onlyValidPixels=False):
+def tf_MSE(tf_y, tf_y_, onlyValidPixels=False):
     print("[Network/Model] Loss Function: MSE")
-
-    # Check if y and y* have the same dimensions
-    # assert ((y.shape[1] == y_.shape[1]) and (y.shape[2] == y_.shape[2])), "Houston we've got a problem"
 
     if onlyValidPixels:
         # Mask out invalid values (values <= 0)!
-        y, y_, tf_npixels_valid = tf_maskOutInvalidPixels(y, y_)
+        tf_y, tf_y_, tf_npixels_valid = tf_maskOutInvalidPixels(tf_y, tf_y_)
         tf_npixels = tf_npixels_valid
     else:
-        tf_npixels = tf.cast(tf.size(y_), tf.float32)  # (batchSize*height*width)
+        tf_npixels = tf.cast(tf.size(tf_y_), tf.float32)  # (batchSize*height*width)
 
-    return tf.reduce_sum(tf.pow(y_ - y, 2)) / tf_npixels
+    return (tf.reduce_sum(tf.pow(tf_y_ - tf_y, 2)) / tf_npixels)[0]
 
 
 # ------- #
@@ -153,17 +142,15 @@ def np_L(y, y_):
 # ------------------ #
 #  L2 Normalization  #
 # ------------------ #
-# TODO: Mover
 def getGlobalVars(scope):
     return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
 
 
-# TODO: Mover
 def getTrainableVars(scope):
     return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
 
 
-def calculateL2norm_Coarse(model):
+def calculateL2norm_Coarse():
     coarse_vars = getTrainableVars("c_")
     # print(coarse_vars)
 
@@ -175,7 +162,7 @@ def calculateL2norm_Coarse(model):
     return TRAINING_L2NORM_BETA * totalSum
 
 
-def calculateL2norm_Fine(model):
+def calculateL2norm_Fine():
     fine_vars = getTrainableVars("f_")
     # print(fine_vars)
 
