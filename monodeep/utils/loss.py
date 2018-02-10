@@ -56,8 +56,6 @@ def tf_maskOutInvalidPixels(tf_y, tf_y_):
     # Kittiraw Continuous (Vitor) - [0, 255]
 
     # Variables
-    tf_y = tf.contrib.layers.flatten(tf_y)  # (batchSize, height*width)
-    tf_y_ = tf.contrib.layers.flatten(tf_y_)  # (batchSize, height*width)
     tf_idx = tf.where(tf_y_ > 0)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
     tf_valid_y = tf.gather_nd(tf_y, tf_idx)
     tf_valid_y_ = tf.gather_nd(tf_y_, tf_idx)
@@ -104,39 +102,29 @@ def tf_BerHu():
 # ------------------------------ #
 #  Training Loss - Eigen,Fergus  #
 # ------------------------------ #
-def tf_L(log_y, log_y_, gamma=0.5, onlyValidPixels=False):
+def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
     print("[Network/Model] Loss Function: Eigen's Log Depth")
 
-    # Check if y and y* have the same dimensions
-    # assert ((log_y.shape[1] == log_y_.shape[1]) and (
-    #         log_y.shape[2] == log_y_.shape[2])), "Houston we've got a problem"
-
-    # Tensorflow Variables
-    if onlyValidPixels:
-        # Mask out invalid values (values <= 0)!
-        log_y, log_y_, tf_npixels = tf_maskOutInvalidPixels(log_y, log_y_)
-        tf_d = log_y - log_y_
-    else:
-        tf_npixels = tf.cast(tf.size(log_y_), tf.float32)  # (batchSize*height*width)
-        tf_d = log_y - log_y_
-
+    # Calculate Difference and Gradients
+    tf_d = tf_log_y - tf_log_y_
     tf_gx_d = gradient_x(tf_d)
     tf_gy_d = gradient_y(tf_d)
 
-    mean_term = (tf.reduce_sum(tf.pow(tf_d, 2)) / tf_npixels)
-    variance_term = ((gamma / tf.pow(tf_npixels, 2)) * tf.pow(tf.reduce_sum(tf_d), 2))
-    grads_term = (tf.reduce_sum(tf.pow(tf_gx_d, 2)) + tf.reduce_sum(tf.pow(tf_gy_d, 2))) / tf_npixels
+    # Mask Out
+    tf_idx = tf.where(tf_log_y_ > 0)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
+    tf_valid_d = tf.gather_nd(tf_d, tf_idx)
+    tf_valid_gx_d = tf.gather_nd(tf_gx_d, tf_idx)
+    tf_valid_gy_d = tf.gather_nd(tf_gy_d, tf_idx)
 
-    # FIXME: variance_term should be negative
-    # tf_loss_d = mean_term - variance_term + grads_term
-    tf_loss_d = mean_term + variance_term + grads_term  # Workaround
+    # Loss
+    tf_valid_npixels = tf.cast(tf.size(tf_valid_d), tf.float32)
+    mean_term = (tf.reduce_sum(tf.pow(tf_d, 2)) / tf_valid_npixels)
+    variance_term = ((gamma / tf.pow(tf_valid_npixels, 2)) * tf.pow(tf.reduce_sum(tf_d), 2))
+    grads_term = (tf.reduce_sum(tf.pow(tf_gx_d, 2)) + tf.reduce_sum(tf.pow(tf_gy_d, 2))) / tf_valid_npixels
+
+    tf_loss_d = mean_term - variance_term + grads_term
 
     return tf_loss_d
-
-
-# TODO: Implementar a loss function do segundo artigo do Fergus (log-domain), ela também apresenta os gradientes verticais e horizontais da diferença b(nabla_x(di) e nabla_y(di), di = y-y*)
-def np_L(y, y_):
-    pass
 
 
 # ------------------ #

@@ -284,7 +284,7 @@ def cropImage(img, x_min=None, x_max=None, y_min=None, y_max=None, size=None):
     return crop
 
 
-def np_resizeImage_bilinear(img, size):
+def np_resizeImage(img, size):
     try:
         if size is None:
             raise ValueError
@@ -316,37 +316,6 @@ def np_resizeImage_bilinear(img, size):
     # debug()
 
     return resized
-
-
-# def tf_resizeImage_bilinear(img, size):
-#     try:
-#         if size is None:
-#             raise ValueError
-#     except ValueError:
-#         print("[ValueError] Oops! Empty resizeSize list. Please sets the desired resizeSize.\n")
-#
-#     # TODO: Terminar
-#     # it's height, width in TF - not width, height
-#     # new_height = int(round(old_height * scale))
-#     # new_width = int(round(old_width * scale))
-#     # resized = tf.image.resize_images(input_tensor, [new_height, new_width])
-#
-#
-#     # Debug
-#     def debug():
-#         print(img)
-#         print(resized)
-#         plt.figure()
-#         plt.imshow(img)
-#         plt.title("img")
-#         plt.figure()
-#         plt.imshow(resized)
-#         plt.title("resized")
-#         plt.show()
-#
-#     # debug()
-#
-#     return resized
 
 
 def normalizeImage(img):
@@ -508,9 +477,8 @@ class MonodeepDataloader(object):
 
         self.image_batch = None
 
-        # TODO: Verificar se é possível obter as informações abaixos de outros vetores ou matrizes
-        self.inputSize = (None, self.datasetObj.imageOutputSize[0], self.datasetObj.imageOutputSize[1], 3)
-        self.outputSize = (None, self.datasetObj.depthOutputSize[0], self.datasetObj.depthOutputSize[1])
+        self.inputSize = (None, self.datasetObj.imageNetworkInputSize[0], self.datasetObj.imageNetworkInputSize[1], 3)
+        self.outputSize = (None, self.datasetObj.depthNetworkOutputSize[0], self.datasetObj.depthNetworkOutputSize[1])
         self.numTrainSamples = len(self.train_dataset)
         self.numTestSamples = len(self.test_dataset)
 
@@ -577,16 +545,13 @@ class MonodeepDataloader(object):
 
             # TODO: Implementar Random Crops,
             # Crops Image
-            img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageOutputSize)
-            img_depth_crop = cropImage(img_depth_aug, size=self.datasetObj.imageOutputSize)
+            img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageNetworkInputSize)
+            img_depth_crop = cropImage(img_depth_aug, size=self.datasetObj.imageNetworkInputSize)
 
             # Normalizes RGB Image and Downsizes Depth Image
             img_colors_normed = normalizeImage(img_colors_crop)
 
-            if self.applyBilinear:
-                img_depth_downsized = img_depth_crop  # Copy
-            else:
-                img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+            img_depth_downsized = np_resizeImage(img_depth_crop, size=self.datasetObj.depthNetworkOutputSize)
 
             # Results
             if showImages:
@@ -635,25 +600,26 @@ class MonodeepDataloader(object):
 
         elif mode == 'test':
             img_colors = scp.imread(os.path.join(colors_path))
-            img_colors_crop = cropImage(img_colors, size=self.datasetObj.imageOutputSize)
+            img_colors_crop = cropImage(img_colors, size=self.datasetObj.imageNetworkInputSize)
             img_colors_normed = normalizeImage(img_colors_crop)
 
             img_depth = None
             img_depth_crop = None
-            img_depth_downsized = None
 
             if depth_path is not None:
                 img_depth = scp.imread(
                     os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
                 img_depth_crop = cropImage(img_depth,
-                                           size=self.datasetObj.imageOutputSize)  # Same cropSize as the colors image
+                                           size=self.datasetObj.imageNetworkInputSize)  # Same cropSize as the colors image
+
+                img_depth_downsized = np_resizeImage(img_depth_crop, size=self.datasetObj.depthNetworkOutputSize)
 
                 if self.applyBilinear:
-                    img_depth_downsized = img_depth_crop  # Copy
+                    img_depth_bilinear = img_depth_crop  # Copy
                 else:
-                    img_depth_downsized = np_resizeImage_bilinear(img_depth_crop, size=self.datasetObj.depthOutputSize)
+                    img_depth_bilinear = None
 
-            return img_colors_normed, img_depth_downsized, img_colors_crop
+            return img_colors_normed, img_depth_downsized, img_colors_crop, img_depth_bilinear
 
     # Data Augmentation
     @staticmethod

@@ -6,29 +6,32 @@
 # =======
 # FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
 # TODO: Validar Métricas.
+# TODO: Adicionar mais topologias
 
+import os
+import sys
+import time
+import warnings
+from collections import deque
+
+import numpy as np
 # ===========
 #  Libraries
 # ===========
 import tensorflow as tf
-import numpy as np
-import time
-import os
-import sys
-import utils.metrics as metrics
+
 import utils.args as args
-
-from collections import deque
-
+import utils.metrics as metrics
+from utils.importNetwork import ImportGraph
 from utils.monodeep_dataloader import MonodeepDataloader
 from utils.monodeep_model import MonodeepModel
-from utils.importNetwork import ImportGraph
 from utils.plot import Plot
 
 # ==================
 #  Global Variables
 # ==================
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+warnings.filterwarnings("ignore")  # Suppress Warnings
 
 appName = 'monodeep'
 datetime = time.strftime("%Y-%m-%d") + '_' + time.strftime("%H-%M-%S")
@@ -37,8 +40,7 @@ ENABLE_EARLY_STOP = True
 ENABLE_RESTORE = True
 ENABLE_TENSORBOARD = True
 SAVE_TEST_DISPARITIES = True
-SHOW_TEST_DISPARITIES = True
-APPLY_BILINEAR_ON_OUTPUT = False  # FIXME: Will not work if onlyValidPixels is True
+APPLY_BILINEAR_ON_OUTPUT = True  # FIXME: Will not work if onlyValidPixels is True
 
 # Early Stop Configuration
 AVG_SIZE = 20
@@ -143,26 +145,27 @@ def train(args, params):
                                     dataloader.inputSize[3]),
                                    dtype=np.uint8)  # (?, 172, 576, 3)
 
-        if APPLY_BILINEAR_ON_OUTPUT:
-            batch_labels = np.zeros((args.batch_size,
-                                     dataloader.inputSize[1],
-                                     dataloader.inputSize[2]),
-                                    dtype=np.int32)  # (?, 172, 576)
+        batch_labels = np.zeros((args.batch_size,
+                                 dataloader.outputSize[1],
+                                 dataloader.outputSize[2]),
+                                dtype=np.int32)  # (?, 43, 144)
 
-            valid_labels_o = np.zeros((len(dataloader.valid_labels),
-                                       dataloader.inputSize[1],
-                                       dataloader.inputSize[2]),
-                                      dtype=np.int32)  # (?, 172, 576)
-        else:
-            batch_labels = np.zeros((args.batch_size,
-                                     dataloader.outputSize[1],
-                                     dataloader.outputSize[2]),
-                                    dtype=np.int32)  # (?, 43, 144)
+        valid_labels_o = np.zeros((len(dataloader.valid_labels),
+                                   dataloader.outputSize[1],
+                                   dataloader.outputSize[2]),
+                                  dtype=np.int32)  # (?, 43, 144)
 
-            valid_labels_o = np.zeros((len(dataloader.valid_labels),
-                                       dataloader.outputSize[1],
-                                       dataloader.outputSize[2]),
-                                      dtype=np.int32)  # (?, 43, 144)
+        # TODO: Faz sentido ter bilinear no train e no valid?
+        # if APPLY_BILINEAR_ON_OUTPUT:
+        #     batch_labelsBilinear = np.zeros((args.batch_size,
+        #                              dataloader.inputSize[1],
+        #                              dataloader.inputSize[2]),
+        #                             dtype=np.int32)  # (?, 172, 576)
+        #
+        #     valid_labelsBilinear_o = np.zeros((len(dataloader.valid_labels),
+        #                                dataloader.inputSize[1],
+        #                                dataloader.inputSize[2]),
+        #                               dtype=np.int32)  # (?, 172, 576)
 
         # =================
         #  Training Loop
@@ -172,10 +175,13 @@ def train(args, params):
             train_plotObj = Plot(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
         for i in range((len(dataloader.valid_dataset))):
-            valid_dataset_o[i], valid_labels_o[i], _, _ = dataloader.readImage(dataloader.valid_dataset[i],
-                                                                               dataloader.valid_labels[i],
-                                                                               mode='valid',
-                                                                               showImages=False)
+            image, depth, _, _ = dataloader.readImage(dataloader.valid_dataset[i],
+                                                      dataloader.valid_labels[i],
+                                                      mode='valid',
+                                                      showImages=False)
+
+            valid_dataset_o[i] = image
+            valid_labels_o[i] = depth
 
         for step in range(args.max_steps):
             start2 = time.time()
@@ -191,10 +197,10 @@ def train(args, params):
 
             for i in range(len(batch_data_path)):
                 # FIXME: os tipos retornados das variaveis estao errados, quando originalmente eram uint8 e int32, lembrar que o placeholder no tensorflow é float32
-                image, depth, image_crop, depth_crop = dataloader.readImage(batch_data_path[i],
-                                                                            batch_labels_path[i],
-                                                                            mode='train',
-                                                                            showImages=False)
+                image, depth, image_crop, _ = dataloader.readImage(batch_data_path[i],
+                                                                   batch_labels_path[i],
+                                                                   mode='train',
+                                                                   showImages=False)
 
                 # print(image.dtype,depth.dtype, image_crop.dtype, depth_crop.dtype)
 
@@ -288,7 +294,7 @@ def train(args, params):
 # ========= #
 def test(args, params):
     # Local Variables
-    if SHOW_TEST_DISPARITIES:
+    if args.show_test_results:
         test_plotObj = Plot(args.mode, title='Test Predictions')  # TODO: Qual o melhor lugar para essa linhas?
 
     print('[%s] Selected mode: Test' % appName)
@@ -301,25 +307,14 @@ def test(args, params):
 
     # Memory Allocation
     # Length of test_dataset used, so when there is not test_labels, the variable will still be declared.
+    predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+                          dtype=np.float32)  # (?, 43, 144)
 
-    if APPLY_BILINEAR_ON_OUTPUT:
-        predCoarse = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                              dtype=np.float32)  # (?, 172, 576)
+    predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
+                        dtype=np.float32)  # (?, 43, 144)
 
-        predFine = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                            dtype=np.float32)  # (?, 172, 576)
-
-        test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
-                                 dtype=np.int32)  # (?, 172, 576)
-    else:
-        predCoarse = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                              dtype=np.float32)  # (?, 43, 144)
-
-        predFine = np.zeros((dataloader.numTestSamples, dataloader.outputSize[1], dataloader.outputSize[2]),
-                            dtype=np.float32)  # (?, 43, 144)
-
-        test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
-                                 dtype=np.int32)  # (?, 43, 144)
+    test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
+                             dtype=np.int32)  # (?, 43, 144)
 
     test_dataset_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
@@ -328,6 +323,17 @@ def test(args, params):
     test_dataset_crop_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
         dtype=np.uint8)  # (?, 172, 576, 3)
+
+    if APPLY_BILINEAR_ON_OUTPUT:
+        predCoarseBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                                      dtype=np.float32)  # (?, 172, 576)
+
+        predFineBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                                    dtype=np.float32)  # (?, 172, 576)
+
+        test_labelsBilinear_o = np.zeros(
+            (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
+            dtype=np.int32)  # (?, 172, 576)
 
     # ==============
     #  Testing Loop
@@ -338,13 +344,13 @@ def test(args, params):
         start2 = time.time()
 
         if dataloader.test_labels:  # It's not empty
-            image, depth, image_crop = dataloader.readImage(dataloader.test_dataset[i], dataloader.test_labels[i],
-                                                            mode='test')
+            image, depth, image_crop, depth_bilinear = dataloader.readImage(dataloader.test_dataset[i],
+                                                                            dataloader.test_labels[i], mode='test')
 
-            # print(image.shape, depth.shape, image_crop.shape)
             test_labels_o[i] = depth
+            # test_labelsBilinear_o[i] = depth_bilinear # TODO: Fazer o mesmo para o Bilinear
         else:
-            image, _, image_crop = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')
+            image, _, image_crop, _ = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')
 
         test_dataset_o[i] = image
         test_dataset_crop_o[i] = image_crop
@@ -385,7 +391,7 @@ def test(args, params):
             "[Network/Testing] It's not possible to calculate Metrics. There are no corresponding labels for Testing Predictions!")
 
     # Show Results
-    if SHOW_TEST_DISPARITIES:
+    if args.show_test_results:
         for i in range(dataloader.numTestSamples):
             test_plotObj.showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
 

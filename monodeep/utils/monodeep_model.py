@@ -161,14 +161,14 @@ class MonodeepModel(object):
                                            shape=(None, self.image_height, self.image_width, self.image_nchannels),
                                            name='image')
 
+            self.tf_labels = tf.placeholder(tf.float32,
+                                            shape=(None, self.depth_height, self.depth_width),
+                                            name='labels')  # (?, 43, 144)
+
             if self.applyBilinear:
-                self.tf_labels = tf.placeholder(tf.float32,
-                                                shape=(None, self.image_height, self.image_width),
-                                                name='labels')  # (?, 172, 576)
-            else:
-                self.tf_labels = tf.placeholder(tf.float32,
-                                                shape=(None, self.depth_height, self.depth_width),
-                                                name='labels')  # (?, 43, 144)
+                self.tf_labels_bilinear = tf.placeholder(tf.float32,
+                                                         shape=(None, self.image_height, self.image_width),
+                                                         name='labels')  # (?, 172, 576)
 
             self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
 
@@ -194,7 +194,11 @@ class MonodeepModel(object):
         try:
             if self.params['model_name'] == 'monodeep':
                 self.createLayers_CoarseFine()
-                self.tf_predCoarse, self.tf_predFine = self.buildModel_CoarseFine(self.tf_image)
+                if self.applyBilinear:
+                    self.tf_predCoarse, self.tf_predFine, self.tf_predCoarseBilinear, self.tf_predFineBilinear = self.buildModel_CoarseFine(
+                        self.tf_image)
+                else:
+                    self.tf_predCoarse, self.tf_predFine = self.buildModel_CoarseFine(self.tf_image)
             else:
                 raise ValueError
         except ValueError:
@@ -206,6 +210,10 @@ class MonodeepModel(object):
 
             tf.add_to_collection('predCoarse', self.tf_predCoarse)
             tf.add_to_collection('predFine', self.tf_predFine)
+
+            if self.applyBilinear:
+                tf.add_to_collection('predCoarseBilinear', self.tf_predCoarseBilinear)
+                tf.add_to_collection('predFineBilinear', self.tf_predFineBilinear)
 
         # Debug
         # print(self.tf_image)
@@ -296,22 +304,23 @@ class MonodeepModel(object):
 
         # Enable for applying resize
         if self.applyBilinear:
-            predCoarse = tf.squeeze(
+            predCoarseBilinear = tf.squeeze(
                 tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
                 axis=3)  # (?, 172, 576)
-            predFine = tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),
-                                  axis=3)  # (?, 172, 576)
-
-        return predCoarse, predFine
+            predFineBilinear = tf.squeeze(
+                tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),
+                axis=3)  # (?, 172, 576)
+            return predCoarse, predFine, predCoarseBilinear, predFineBilinear
+        else:
+            return predCoarse, predFine
 
     # TODO: adicionar L2Norm
     def build_losses(self):
         with tf.name_scope("Losses"):
             # Select Loss Function:
             # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)
-            self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
-            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=False)
-            # self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5, onlyValidPixels=True) # FIXME:
+            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
+            self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5)
 
     def build_optimizer(self):
         with tf.name_scope("Optimizer"):
@@ -347,7 +356,5 @@ class MonodeepModel(object):
         # train_saver = tf.train.Saver()                                                  # ~4.3 Gb
         # train_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))  # ~850 mb
 
-        file_path = saver.save(session, os.path.join(save_path,
-                                                     "model." + model_name + ".ckpt"))  # TODO: Acredito que seja possível remover .ckpt. Rodar networkTraining em modo 'test' e networkPredict_example.py para validar essa mudanca.
-
+        file_path = saver.save(session, os.path.join(save_path, "model." + model_name))
         print("\n[Results] Model saved in file: %s" % file_path)

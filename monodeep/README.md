@@ -17,23 +17,17 @@ Most Indicated scenes list (without static scenes):
 # Training
 Ex: 
     
-    ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t			(Deprecated)
-    ./monodeep.py -m train -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_residential_continuous.pkl --max_steps 300 -t	(Deprecated)
-	
     ./monodeep.py -m train -s kitti2012 --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s kitti2015 --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s kittiraw_campus --max_steps 1000 -t -d 0.5
     ./monodeep.py -m train -s nyudepth --max_steps 100 -d 0.5 --ldecay
-    ./monodeep.py -m train -s kittiraw_residential_continuous --max_steps 10 -d 0.5 --ldecay -t
+    ./monodeep.py -m train -s kittiraw_residential_continuous --max_steps 10 -d 0.5 --ldecay -t --gpu 0
 
 # Testing/Restore
 Ex: 
-    python3 stereo_cnn.py -i output/dataset_preparation/kittiRaw_road.pkl -r output/stereo_cnn/kittiRaw_road/2017-10-10_19-08-06/restore
-    python3 stereo_cnn.py -i output/dataset_preparation/kittiRaw_city.pkl -r output/stereo_cnn/kittiRaw_city/2017-10-10_20-36-35/restore
-    
-    ./monodeep.py -m test -i /home/olorin/Documents/nicolas/tensorflow/tese/dataset_preparation/output/kittiraw_campus.pkl --max_steps 300 -t	(Deprecated)
+
     ./monodeep.py -m test -s kitti2012 -r output/monodeep/2018-01-27_14-20-07/restore/
-    ./monodeep.py -m test -s kittiraw_residential_continuous -r output/monodeep/2018-01-27_17-53-29/restore
+    ./monodeep.py -m test -s kittiraw_residential_continuous -r output/monodeep/2018-02-09_15-21-56/restore/ -u 
     
 # Dataset Prepation Script
 
@@ -45,4 +39,3 @@ Ex:
     python3 dataset_preparation.py -s kitti2012 (Deprecated)
     python3 dataset_preparation.py -s kitti2015 (Deprecated)
     python3 dataset_preparation.py -s nyuDepth  (Deprecated)
-

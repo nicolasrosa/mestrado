@@ -31,7 +31,6 @@ class Plot(object):
             self.axes[2] = plt.subplot(223)
             self.axes[3] = plt.subplot(224)
 
-        self.fig = plt.gcf()  # TODO: Posso remover?
         self.fig.canvas.set_window_title(title)
         self.isFirstTime = True
 
@@ -117,7 +116,6 @@ class Plot(object):
 
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 
-        fig = plt.gcf()  # TODO: Posso remover?
         fig.canvas.set_window_title("Train Predictions")
 
         plt.pause(0.001)

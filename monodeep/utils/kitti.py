@@ -12,7 +12,9 @@ class Kitti(object):
         self.imageInputSize = [376, 1241]
         self.depthInputSize = [376, 1226]
 
-        self.imageOutputSize = [172, 576]
-        self.depthOutputSize = [43, 144]
+        self.imageNetworkInputSize = [172, 576]
+        self.depthNetworkOutputSize = [43, 144]
+
+        self.depthBilinearOutputSize = [172, 576]
 
         print("[monodeep/Dataloader] Kitti object created.")
