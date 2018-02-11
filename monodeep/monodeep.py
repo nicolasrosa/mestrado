@@ -8,6 +8,12 @@
 # TODO: Validar Métricas.
 # TODO: Adicionar mais topologias
 
+# Known Bugs
+# Leitura e Processamento das Imagens estão sendo feitos na CPU
+# Bilinear está sendo utilizado corretamente?
+# Data Augmentation - Brightness not working
+# SAVE_TEST_DISPARITIES - Funciona, mas nao uso propriamente
+
 import os
 import sys
 import time
@@ -37,10 +43,10 @@ appName = 'monodeep'
 datetime = time.strftime("%Y-%m-%d") + '_' + time.strftime("%H-%M-%S")
 
 ENABLE_EARLY_STOP = True
-ENABLE_RESTORE = True
+SAVE_TRAINED_MODEL = True
 ENABLE_TENSORBOARD = True
 SAVE_TEST_DISPARITIES = True
-APPLY_BILINEAR_ON_OUTPUT = True  # FIXME: Will not work if onlyValidPixels is True
+APPLY_BILINEAR_OUTPUT = False
 
 # Early Stop Configuration
 AVG_SIZE = 20
@@ -55,7 +61,7 @@ def createSaveFolder():
     save_path = None
     save_restore_path = None
 
-    if ENABLE_RESTORE or ENABLE_TENSORBOARD:
+    if SAVE_TRAINED_MODEL or ENABLE_TENSORBOARD:
         # Saves the model variables to disk.
         relative_save_path = 'output/' + appName + '/' + datetime + '/'
         save_path = os.path.join(os.getcwd(), relative_save_path)
@@ -71,13 +77,13 @@ def createSaveFolder():
 #  Training/Validation  #
 # ===================== #
 def train(args, params):
-    # Local Variables
-    movMeanLast = 0
-    movMean = deque()
-
     print('[%s] Selected mode: Train' % appName)
     print('[%s] Selected Params: ' % appName)
     print("\t", args)
+
+    # Local Variables
+    movMeanLast = 0
+    movMean = deque()
 
     save_path, save_restore_path = createSaveFolder()
 
@@ -87,11 +93,11 @@ def train(args, params):
     graph = tf.Graph()
     with graph.as_default():
         # MonoDepth
-        dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode, APPLY_BILINEAR_ON_OUTPUT)
+        dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode)
         params['inputSize'] = dataloader.inputSize
         params['outputSize'] = dataloader.outputSize
 
-        model = MonodeepModel(args.mode, params, APPLY_BILINEAR_ON_OUTPUT)
+        model = MonodeepModel(args.mode, params)
 
         def test_dataAug():
             for i in range(10):
@@ -112,12 +118,52 @@ def train(args, params):
     # ----------------------------------------
     #  Network Training Model - Running Graph
     # ----------------------------------------
+    # Local Variables and Memory Allocation
+    step, stabCounter = 0, 0
+    train_lossF, valid_lossF = None, None
+
+    batch_data = np.zeros((args.batch_size,
+                           dataloader.inputSize[1],
+                           dataloader.inputSize[2],
+                           dataloader.inputSize[3]),
+                          dtype=np.float64)  # (?, 172, 576, 3)
+
+    batch_data_crop = np.zeros((args.batch_size,
+                                dataloader.inputSize[1],
+                                dataloader.inputSize[2],
+                                dataloader.inputSize[3]),
+                               dtype=np.uint8)  # (?, 172, 576, 3)
+
+    valid_dataset_o = np.zeros((len(dataloader.valid_dataset),
+                                dataloader.inputSize[1],
+                                dataloader.inputSize[2],
+                                dataloader.inputSize[3]),
+                               dtype=np.uint8)  # (?, 172, 576, 3)
+
+    batch_labels = np.zeros((args.batch_size,
+                             dataloader.outputSize[1],
+                             dataloader.outputSize[2]),
+                            dtype=np.int32)  # (?, 43, 144)
+
+    valid_labels_o = np.zeros((len(dataloader.valid_labels),
+                               dataloader.outputSize[1],
+                               dataloader.outputSize[2]),
+                              dtype=np.int32)  # (?, 43, 144)
+
+    # TODO: Faz sentido ter bilinear no train e no valid?
+    # if APPLY_BILINEAR_OUTPUT:
+    #     batch_labelsBilinear = np.zeros((args.batch_size,
+    #                              dataloader.inputSize[1],
+    #                              dataloader.inputSize[2]),
+    #                             dtype=np.int32)  # (?, 172, 576)
+    #
+    #     valid_labelsBilinear_o = np.zeros((len(dataloader.valid_labels),
+    #                                dataloader.inputSize[1],
+    #                                dataloader.inputSize[2]),
+    #                               dtype=np.int32)  # (?, 172, 576)
+
     print("\n[Network/Training] Running built graph...")
     with tf.Session(graph=graph) as session:
-        # Local Variables
-        step, stabCounter = 0, 0
-        train_lossF, valid_lossF = None, None
-
         tf.global_variables_initializer().run()
 
         print("[Network/Training] Training Initialized!\n")
@@ -126,53 +172,12 @@ def train(args, params):
         epochs = np.floor(args.batch_size * args.max_steps / dataloader.numTrainSamples)
         print('Train with approximately %d epochs' % epochs)
 
-        # Memory Allocation
-        batch_data = np.zeros((args.batch_size,
-                               dataloader.inputSize[1],
-                               dataloader.inputSize[2],
-                               dataloader.inputSize[3]),
-                              dtype=np.float64)  # (?, 172, 576, 3)
-
-        batch_data_crop = np.zeros((args.batch_size,
-                                    dataloader.inputSize[1],
-                                    dataloader.inputSize[2],
-                                    dataloader.inputSize[3]),
-                                   dtype=np.uint8)  # (?, 172, 576, 3)
-
-        valid_dataset_o = np.zeros((len(dataloader.valid_dataset),
-                                    dataloader.inputSize[1],
-                                    dataloader.inputSize[2],
-                                    dataloader.inputSize[3]),
-                                   dtype=np.uint8)  # (?, 172, 576, 3)
-
-        batch_labels = np.zeros((args.batch_size,
-                                 dataloader.outputSize[1],
-                                 dataloader.outputSize[2]),
-                                dtype=np.int32)  # (?, 43, 144)
-
-        valid_labels_o = np.zeros((len(dataloader.valid_labels),
-                                   dataloader.outputSize[1],
-                                   dataloader.outputSize[2]),
-                                  dtype=np.int32)  # (?, 43, 144)
-
-        # TODO: Faz sentido ter bilinear no train e no valid?
-        # if APPLY_BILINEAR_ON_OUTPUT:
-        #     batch_labelsBilinear = np.zeros((args.batch_size,
-        #                              dataloader.inputSize[1],
-        #                              dataloader.inputSize[2]),
-        #                             dtype=np.int32)  # (?, 172, 576)
-        #
-        #     valid_labelsBilinear_o = np.zeros((len(dataloader.valid_labels),
-        #                                dataloader.inputSize[1],
-        #                                dataloader.inputSize[2]),
-        #                               dtype=np.int32)  # (?, 172, 576)
-
         # =================
         #  Training Loop
         # =================
         start = time.time()
         if args.show_train_progress:
-            train_plotObj = Plot(args.mode, title='Train Predictions')  # TODO: Qual o melhor lugar para essa linhas?
+            train_plotObj = Plot(args.mode, title='Train Predictions')
 
         for i in range((len(dataloader.valid_dataset))):
             image, depth, _, _ = dataloader.readImage(dataloader.valid_dataset[i],
@@ -273,19 +278,19 @@ def train(args, params):
 
         end = time.time()
         sim_train = end - start
-        print("\n[Network/Training] Training FINISHED! Time elapsed: %f s" % sim_train)
+        print("\n[Network/Training] Training FINISHED! Time elapsed: %f s\n" % sim_train)
 
         # ==============
         #  Save Results
         # ==============
-        if ENABLE_RESTORE:
+        if SAVE_TRAINED_MODEL:
             model.saveTrainedModel(save_restore_path, session, train_saver, args.model_name)
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
         f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\t%f\n" % (
-            datetime, appName, args.dataset, step, train_lossF,
-            valid_lossF, sim_train))  # TODO: Nao salvar o appName, e sim o nome do model utilizado.
+            datetime, args.model_name, args.dataset, step, train_lossF,
+            valid_lossF, sim_train))
         f.close()
 
 
@@ -293,16 +298,15 @@ def train(args, params):
 #  Testing  #
 # ========= #
 def test(args, params):
-    # Local Variables
-    if args.show_test_results:
-        test_plotObj = Plot(args.mode, title='Test Predictions')  # TODO: Qual o melhor lugar para essa linhas?
-
     print('[%s] Selected mode: Test' % appName)
     print('[%s] Selected Params: %s' % (appName, args))
 
     # TODO: fazer rotina para pegar imagens externas, nao somente do dataset
+    # -----------------------------------------
+    #  Network Testing Model - Importing Graph
+    # -----------------------------------------
     # Loads the dataset and restores a specified trained model.
-    dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode, APPLY_BILINEAR_ON_OUTPUT)
+    dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode)
     model = ImportGraph(args.restore_path)
 
     # Memory Allocation
@@ -324,38 +328,42 @@ def test(args, params):
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
         dtype=np.uint8)  # (?, 172, 576, 3)
 
-    if APPLY_BILINEAR_ON_OUTPUT:
-        predCoarseBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                                      dtype=np.float32)  # (?, 172, 576)
+    predCoarseBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                                  dtype=np.float32)  # (?, 172, 576)
 
-        predFineBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
-                                    dtype=np.float32)  # (?, 172, 576)
+    predFineBilinear = np.zeros((dataloader.numTestSamples, dataloader.inputSize[1], dataloader.inputSize[2]),
+                                dtype=np.float32)  # (?, 172, 576)
 
-        test_labelsBilinear_o = np.zeros(
-            (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
-            dtype=np.int32)  # (?, 172, 576)
+    # TODO: Usar?
+    # test_labelsBilinear_o = np.zeros(
+    #     (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2]),
+    #     dtype=np.int32)  # (?, 172, 576)
 
     # ==============
     #  Testing Loop
     # ==============
     start = time.time()
-
     for i, image_path in enumerate(dataloader.test_dataset):
         start2 = time.time()
 
         if dataloader.test_labels:  # It's not empty
             image, depth, image_crop, depth_bilinear = dataloader.readImage(dataloader.test_dataset[i],
-                                                                            dataloader.test_labels[i], mode='test')
+                                                                            dataloader.test_labels[i],
+                                                                            mode='test')
 
             test_labels_o[i] = depth
-            # test_labelsBilinear_o[i] = depth_bilinear # TODO: Fazer o mesmo para o Bilinear
+            # test_labelsBilinear_o[i] = depth_bilinear # TODO: Usar?
         else:
             image, _, image_crop, _ = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')
 
         test_dataset_o[i] = image
         test_dataset_crop_o[i] = image_crop
 
-        predCoarse[i], predFine[i] = model.networkPredict(image)
+        if APPLY_BILINEAR_OUTPUT:
+            predCoarse[i], predFine[i], predCoarseBilinear[i], predFineBilinear[i] = model.networkPredict(image,
+                                                                                                          APPLY_BILINEAR_OUTPUT)
+        else:
+            predCoarse[i], predFine[i] = model.networkPredict(image)
 
         # Prints Testing Progress
         end2 = time.time()
@@ -392,6 +400,7 @@ def test(args, params):
 
     # Show Results
     if args.show_test_results:
+        test_plotObj = Plot(args.mode, title='Test Predictions')
         for i in range(dataloader.numTestSamples):
             test_plotObj.showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
 
@@ -400,8 +409,6 @@ def test(args, params):
 #  Main
 # ======
 def main(args):
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
     """ This Coarse-to-Fine Network Architecture predicts the log depth (log y)."""
     print("[%s] Running..." % appName)
 
@@ -424,4 +431,6 @@ def main(args):
 # ======
 if __name__ == '__main__':
     args = args.argumentHandler()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+
     tf.app.run(main=main(args))

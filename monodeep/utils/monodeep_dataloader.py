@@ -346,10 +346,8 @@ def adjust_brightness(image, brightness):
 #  Class Declaration
 # ===================
 class MonodeepDataloader(object):
-    def __init__(self, data_path, params, dataset, mode, applyBilinear, TRAIN_VALID_RATIO=0.8):
+    def __init__(self, data_path, params, dataset, mode, TRAIN_VALID_RATIO=0.8):
         # 80% for Training and 20% for Validation
-        self.applyBilinear = applyBilinear
-
         checkArgumentsIntegrity(dataset)
         print("\n[monodeep/Dataloader] Description: This script prepares the ", dataset,
               ".pkl file for posterior Networks training.",
@@ -451,25 +449,6 @@ class MonodeepDataloader(object):
         print("test_dataset shape:", len(self.test_dataset))
         print("test_labels shape:", len(self.test_labels))
 
-        # # TODO: Aprimorar
-        # f = open('kitti_train_filenames.txt', 'w')
-        # for i in range(len(self.train_dataset)):
-        #     f.write("%s %s\n" % (self.train_dataset[i], self.train_labels[i]))
-        # f.close()
-        #
-        # f = open('kitti_valid_filenames.txt', 'w')
-        # for i in range(len(self.valid_dataset)):
-        #     f.write("%s %s\n" % (self.valid_dataset[i], self.valid_labels[i]))
-        # f.close()
-        #
-        # f = open('kitti_test_filenames.txt', 'w')
-        # for i in range(len(self.test_dataset)):
-        #     if len(self.test_labels):
-        #         f.write("%s %s\n" % (self.test_dataset[i], self.test_labels[i]))
-        #     else:
-        #         f.write("%s\n" % (self.test_dataset[i]))
-        # f.close()
-
         self.data_path = data_path
         self.params = params
         self.dataset = dataset
@@ -543,7 +522,7 @@ class MonodeepDataloader(object):
             # Data Augmentation
             img_colors_aug, img_depth_aug = self.augment_image_pair(img_colors, img_depth)
 
-            # TODO: Implementar Random Crops,
+            # TODO: Implementar Random Crops
             # Crops Image
             img_colors_crop = cropImage(img_colors_aug, size=self.datasetObj.imageNetworkInputSize)
             img_depth_crop = cropImage(img_depth_aug, size=self.datasetObj.imageNetworkInputSize)
@@ -605,23 +584,20 @@ class MonodeepDataloader(object):
 
             img_depth = None
             img_depth_crop = None
+            img_depth_downsized = None
+            img_depth_bilinear = None
 
             if depth_path is not None:
                 img_depth = scp.imread(
-                    os.path.join(depth_path))  # TODO: Existem datasets que possuem label, ex: kittiraw_campus
+                    os.path.join(depth_path))
                 img_depth_crop = cropImage(img_depth,
                                            size=self.datasetObj.imageNetworkInputSize)  # Same cropSize as the colors image
 
                 img_depth_downsized = np_resizeImage(img_depth_crop, size=self.datasetObj.depthNetworkOutputSize)
-
-                if self.applyBilinear:
-                    img_depth_bilinear = img_depth_crop  # Copy
-                else:
-                    img_depth_bilinear = None
+                img_depth_bilinear = img_depth_crop  # Copy
 
             return img_colors_normed, img_depth_downsized, img_colors_crop, img_depth_bilinear
 
-    # Data Augmentation
     @staticmethod
     def augment_image_pair(image, depth):
         """ATTENTION! Remember to also reproduce the transforms in the depth image. However, colors transformations can DEGRADE depth information!!!"""

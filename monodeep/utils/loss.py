@@ -48,7 +48,6 @@ def np_maskOutInvalidPixels(y, y_):
     return y_masked
 
 
-# FIXME: Não funciona, junto com o Bilinear  ResourceExhaustedError (Pegando muita Memória)
 def tf_maskOutInvalidPixels(tf_y, tf_y_):
     # Values Range
     # NyuDepth - ]0, ~4000]
@@ -120,7 +119,7 @@ def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
     tf_valid_npixels = tf.cast(tf.size(tf_valid_d), tf.float32)
     mean_term = (tf.reduce_sum(tf.pow(tf_d, 2)) / tf_valid_npixels)
     variance_term = ((gamma / tf.pow(tf_valid_npixels, 2)) * tf.pow(tf.reduce_sum(tf_d), 2))
-    grads_term = (tf.reduce_sum(tf.pow(tf_gx_d, 2)) + tf.reduce_sum(tf.pow(tf_gy_d, 2))) / tf_valid_npixels
+    grads_term = (tf.reduce_sum(tf.pow(tf_valid_gx_d, 2)) + tf.reduce_sum(tf.pow(tf_valid_gy_d, 2))) / tf_valid_npixels
 
     tf_loss_d = mean_term - variance_term + grads_term
 

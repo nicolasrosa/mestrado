@@ -1,9 +1,10 @@
 # ===========
 #  Libraries
 # ===========
+import os
+
 import numpy as np
 import tensorflow as tf
-import os
 
 
 # ===================
@@ -11,6 +12,7 @@ import os
 # ===================
 class ImportGraph(object):
     """  Importing and running isolated TF graph """
+
     def __init__(self, restore_path):
         # Local Variables
         restore_filepath = None
@@ -50,7 +52,10 @@ class ImportGraph(object):
             self.tf_predFine = tf.get_collection('predFine')[0]
             self.tf_keep_prob = tf.get_collection('keep_prob')[0]
 
-    def networkPredict(self, image):
+            self.tf_predCoarseBilinear = tf.get_collection('predCoarseBilinear')[0]
+            self.tf_predFineBilinear = tf.get_collection('predFineBilinear')[0]
+
+    def networkPredict(self, image, applyBilinear=False):
         """ Running the activation function previously imported """
         # The 'inputs' corresponds to name of input placeholder
         data = np.expand_dims(image, 0)  # (idx, height, width, numChannels) - Normalized
@@ -59,5 +64,16 @@ class ImportGraph(object):
         # ----- Session Run! ----- #
         predCoarse, predFine = self.sess.run([self.tf_predCoarse, self.tf_predFine], feed_dict=feed_dict)
         # -----
+
+        if applyBilinear:
+            # ----- Session Run! ----- #
+            predCoarseBilinear, predFineBilinear = self.sess.run([self.tf_predCoarseBilinear, self.tf_predFineBilinear],
+                                                                 feed_dict)
+            # -----
+
+            # scp.imshow(predCoarseBilinear[0])
+            # scp.imshow(predFineBilinear[0])
+
+            return predCoarse, predFine, predCoarseBilinear, predFineBilinear
 
         return predCoarse, predFine

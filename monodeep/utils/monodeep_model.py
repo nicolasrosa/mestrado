@@ -114,12 +114,11 @@ class Fine(object):
 
 
 class MonodeepModel(object):
-    def __init__(self, mode, params, applyBilinear):
+    def __init__(self, mode, params):
         print(params)
 
         self.params = params
         self.mode = mode
-        self.applyBilinear = applyBilinear
 
         model_index = 0
         self.model_collection = ['model_' + str(model_index)]
@@ -165,10 +164,9 @@ class MonodeepModel(object):
                                             shape=(None, self.depth_height, self.depth_width),
                                             name='labels')  # (?, 43, 144)
 
-            if self.applyBilinear:
-                self.tf_labels_bilinear = tf.placeholder(tf.float32,
-                                                         shape=(None, self.image_height, self.image_width),
-                                                         name='labels')  # (?, 172, 576)
+            self.tf_labels_bilinear = tf.placeholder(tf.float32,
+                                                     shape=(None, self.image_height, self.image_width),
+                                                     name='labels')  # (?, 172, 576)
 
             self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
 
@@ -194,11 +192,8 @@ class MonodeepModel(object):
         try:
             if self.params['model_name'] == 'monodeep':
                 self.createLayers_CoarseFine()
-                if self.applyBilinear:
-                    self.tf_predCoarse, self.tf_predFine, self.tf_predCoarseBilinear, self.tf_predFineBilinear = self.buildModel_CoarseFine(
+                self.tf_predCoarse, self.tf_predFine, self.tf_predCoarseBilinear, self.tf_predFineBilinear = self.buildModel_CoarseFine(
                         self.tf_image)
-                else:
-                    self.tf_predCoarse, self.tf_predFine = self.buildModel_CoarseFine(self.tf_image)
             else:
                 raise ValueError
         except ValueError:
@@ -210,10 +205,8 @@ class MonodeepModel(object):
 
             tf.add_to_collection('predCoarse', self.tf_predCoarse)
             tf.add_to_collection('predFine', self.tf_predFine)
-
-            if self.applyBilinear:
-                tf.add_to_collection('predCoarseBilinear', self.tf_predCoarseBilinear)
-                tf.add_to_collection('predFineBilinear', self.tf_predFineBilinear)
+            tf.add_to_collection('predCoarseBilinear', self.tf_predCoarseBilinear)
+            tf.add_to_collection('predFineBilinear', self.tf_predFineBilinear)
 
         # Debug
         # print(self.tf_image)
@@ -272,9 +265,15 @@ class MonodeepModel(object):
         # hidden3 = tf.nn.relu(conv3 + fine.bh3) # ReLU
         self.fine.hidden3 = self.fine.conv3 + self.fine.bh3  # Linear
 
-        # Apply Bilinear to Predictions Outputs for restoring Original Dataset size.
         predCoarse = self.coarse.fc2
         predFine = tf.squeeze(self.fine.hidden3, axis=3)  # self.fine.hidden3[:, :, :, 0]
+
+        # Apply Bilinear to Predictions Outputs for restoring Original Dataset size.
+        predCoarseBilinear = tf.squeeze(
+            tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
+            axis=3)  # (?, 172, 576)
+        predFineBilinear = tf.squeeze(tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),
+                                      axis=3)  # (?, 172, 576)
 
         # Debug
         def debug():
@@ -302,17 +301,7 @@ class MonodeepModel(object):
 
         # debug()
 
-        # Enable for applying resize
-        if self.applyBilinear:
-            predCoarseBilinear = tf.squeeze(
-                tf.image.resize_images(tf.expand_dims(self.coarse.fc2, axis=3), [self.image_height, self.image_width]),
-                axis=3)  # (?, 172, 576)
-            predFineBilinear = tf.squeeze(
-                tf.image.resize_images(self.fine.hidden3, [self.image_height, self.image_width]),
-                axis=3)  # (?, 172, 576)
-            return predCoarse, predFine, predCoarseBilinear, predFineBilinear
-        else:
-            return predCoarse, predFine
+        return predCoarse, predFine, predCoarseBilinear, predFineBilinear
 
     # TODO: adicionar L2Norm
     def build_losses(self):
@@ -350,6 +339,7 @@ class MonodeepModel(object):
     def saveTrainedModel(save_path, session, saver, model_name):
         """ Saves trained model """
         # Creates saver obj which backups all the variables.
+        print("[Network/Training] List of Saved Variables:")
         for i in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
             print(i)  # i.name if you want just a name
 
