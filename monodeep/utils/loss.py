@@ -7,11 +7,7 @@ import tensorflow as tf
 # ==================
 #  Global Variables
 # ==================
-TRAINING_BATCH_SIZE = 16
-TRAINING_LEARNINGDECAY_STEPS = 1000
-TRAINING_LEARNINGDECAY_RATE = 0.95
-TRAINING_L2NORM_BETA = 1000
-LOSS_LOG_INITIAL_VALUE = 1e-6
+TRAINING_L2NORM_BETA = 1e-3
 
 
 # ===========
@@ -72,17 +68,12 @@ def np_MSE(y, y_):
     return np.power(y_ - y, 2) / numPixels  # MSE calculated for each pixel
 
 
-def tf_MSE(tf_y, tf_y_, onlyValidPixels=False):
+def tf_MSE(tf_valid_y, tf_valid_log_y_):
     loss_name = 'MSE'
 
-    if onlyValidPixels:
-        # Mask out invalid values (values <= 0)!
-        tf_y, tf_y_, tf_npixels_valid = tf_maskOutInvalidPixels(tf_y, tf_y_)
-        tf_npixels = tf_npixels_valid
-    else:
-        tf_npixels = tf.cast(tf.size(tf_y_), tf.float32)  # (batchSize*height*width)
+    tf_npixels_valid = tf.cast(tf.size(tf_valid_log_y_), tf.float32)  # (batchSize*height*width)
 
-    return loss_name, (tf.reduce_sum(tf.pow(tf_y_ - tf_y, 2)) / tf_npixels)[0]
+    return loss_name, (tf.reduce_sum(tf.pow(tf_valid_log_y_ - tf_valid_y, 2)) / tf_npixels_valid)
 
 
 # ------- #
@@ -101,7 +92,7 @@ def tf_BerHu():
 # ------------------------------ #
 #  Training Loss - Eigen,Fergus  #
 # ------------------------------ #
-def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
+def tf_L(tf_log_y, tf_log_y_, tf_idx, gamma=0.5):
     loss_name = "Eigen's Log Depth"
 
     # Calculate Difference and Gradients
@@ -110,7 +101,6 @@ def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
     tf_gy_d = gradient_y(tf_d)
 
     # Mask Out
-    tf_idx = tf.where(tf_log_y_ > 0)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
     tf_valid_d = tf.gather_nd(tf_d, tf_idx)
     tf_valid_gx_d = tf.gather_nd(tf_gx_d, tf_idx)
     tf_valid_gy_d = tf.gather_nd(tf_gy_d, tf_idx)
@@ -137,25 +127,22 @@ def getTrainableVars(scope):
     return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
 
 
-def calculateL2norm_Coarse():
+def calculateL2norm():
     coarse_vars = getTrainableVars("c_")
-    # print(coarse_vars)
+    fine_vars = getTrainableVars("f_")
 
     totalSum = 0
     for i, val in enumerate(coarse_vars):
         totalSum += tf.nn.l2_loss(val)
         # print (i, val)
 
-    return TRAINING_L2NORM_BETA * totalSum
-
-
-def calculateL2norm_Fine():
-    fine_vars = getTrainableVars("f_")
-    # print(fine_vars)
-
-    totalSum = 0
     for i, val in enumerate(fine_vars):
         totalSum += tf.nn.l2_loss(val)
         # print (i, val)
+
+    # Debug
+    # print(coarse_vars)
+    # print(fine_vars)
+    # print("totalSum: ", totalSum)
 
     return TRAINING_L2NORM_BETA * totalSum

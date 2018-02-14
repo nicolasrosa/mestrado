@@ -12,6 +12,9 @@ import utils.loss as loss
 LOSS_LOG_INITIAL_VALUE = 0.1
 
 
+# LOSS_LOG_INITIAL_VALUE = 1e-6
+
+
 # ===========
 #  Functions
 # ===========
@@ -168,7 +171,13 @@ class MonodeepModel(object):
                                                      shape=(None, self.image_height, self.image_width),
                                                      name='labels')  # (?, 172, 576)
 
-            self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE, name='log_labels')
+            self.tf_log_labels = tf.log(self.tf_labels + LOSS_LOG_INITIAL_VALUE,
+                                        name='log_labels')  # Just for displaying Image
+
+            # Mask Out Pixels without depth values
+            self.tf_idx = tf.where(self.tf_labels > 0)  # Tensor 'idx' of Valid Pixel values (batchID, idx)
+            self.tf_valid_labels = tf.gather_nd(self.tf_labels, self.tf_idx)
+            self.tf_valid_log_labels = tf.log(self.tf_valid_labels, name='log_labels')
 
             self.tf_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
             self.tf_global_step = tf.Variable(0, trainable=False,
@@ -193,7 +202,7 @@ class MonodeepModel(object):
             if self.params['model_name'] == 'monodeep':
                 self.createLayers_CoarseFine()
                 self.tf_predCoarse, self.tf_predFine, self.tf_predCoarseBilinear, self.tf_predFineBilinear = self.buildModel_CoarseFine(
-                        self.tf_image)
+                    self.tf_image)
             else:
                 raise ValueError
         except ValueError:
@@ -303,13 +312,17 @@ class MonodeepModel(object):
 
         return predCoarse, predFine, predCoarseBilinear, predFineBilinear
 
-    # TODO: adicionar L2Norm
     def build_losses(self):
         with tf.name_scope("Losses"):
+            # Mask Out Prediction
+            self.tf_valid_predFine = tf.gather_nd(self.tf_predFine, self.tf_idx)
+
             # Select Loss Function:
-            # self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False) # FIXME: Not working
-            self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
-            # self.loss_name, self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5)
+            self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_valid_predFine, self.tf_valid_log_labels)  # Default
+            # self.loss_name, self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, self.tf_idx, gamma=0.5) # Internal Mask Out, because of calculation of gradients.
+
+            if self.params['l2norm']:
+                self.tf_lossF += loss.calculateL2norm()
 
             print("[Network/Model] Loss Function: %s" % self.loss_name)
 
