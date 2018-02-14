@@ -288,8 +288,8 @@ def train(args, params):
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
-        f.write("%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\t%f\n" % (
-            datetime, args.model_name, args.dataset, step, train_lossF,
+        f.write("%s\t\t%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\t%f\n" % (
+            datetime, args.model_name, args.dataset, model.loss_name,  step, train_lossF,
             valid_lossF, sim_train))
         f.close()
 

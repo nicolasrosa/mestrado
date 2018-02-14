@@ -307,9 +307,11 @@ class MonodeepModel(object):
     def build_losses(self):
         with tf.name_scope("Losses"):
             # Select Loss Function:
-            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False)
-            # self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
-            self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5)
+            # self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=False) # FIXME: Not working
+            self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_predFine, self.tf_log_labels, onlyValidPixels=True)     # Default
+            # self.loss_name, self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, gamma=0.5)
+
+            print("[Network/Model] Loss Function: %s" % self.loss_name)
 
     def build_optimizer(self):
         with tf.name_scope("Optimizer"):

@@ -73,7 +73,7 @@ def np_MSE(y, y_):
 
 
 def tf_MSE(tf_y, tf_y_, onlyValidPixels=False):
-    print("[Network/Model] Loss Function: MSE")
+    loss_name = 'MSE'
 
     if onlyValidPixels:
         # Mask out invalid values (values <= 0)!
@@ -82,7 +82,7 @@ def tf_MSE(tf_y, tf_y_, onlyValidPixels=False):
     else:
         tf_npixels = tf.cast(tf.size(tf_y_), tf.float32)  # (batchSize*height*width)
 
-    return (tf.reduce_sum(tf.pow(tf_y_ - tf_y, 2)) / tf_npixels)[0]
+    return loss_name, (tf.reduce_sum(tf.pow(tf_y_ - tf_y, 2)) / tf_npixels)[0]
 
 
 # ------- #
@@ -102,7 +102,7 @@ def tf_BerHu():
 #  Training Loss - Eigen,Fergus  #
 # ------------------------------ #
 def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
-    print("[Network/Model] Loss Function: Eigen's Log Depth")
+    loss_name = "Eigen's Log Depth"
 
     # Calculate Difference and Gradients
     tf_d = tf_log_y - tf_log_y_
@@ -123,7 +123,7 @@ def tf_L(tf_log_y, tf_log_y_, gamma=0.5):
 
     tf_loss_d = mean_term - variance_term + grads_term
 
-    return tf_loss_d
+    return loss_name, tf_loss_d
 
 
 # ------------------ #
