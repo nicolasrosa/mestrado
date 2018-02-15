@@ -7,6 +7,7 @@
 # FIXME: Após uma conversa com o vitor, aparentemente tanto a saida do coarse/fine devem ser lineares, nao eh necessario apresentar o otimizar da Coarse e a rede deve prever log(depth), para isso devo converter os labels para log(y_)
 # TODO: Validar Métricas.
 # TODO: Adicionar mais topologias
+# TODO: If detect Ctrl+C, save training state.
 
 # Known Bugs
 # Leitura e Processamento das Imagens estão sendo feitos na CPU
@@ -92,7 +93,7 @@ def train(args, params):
     # -----------------------------------------
     graph = tf.Graph()
     with graph.as_default():
-        # MonoDepth
+        # MonoDeep
         dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode)
         params['inputSize'] = dataloader.inputSize
         params['outputSize'] = dataloader.outputSize
@@ -155,18 +156,6 @@ def train(args, params):
                                dataloader.outputSize[1],
                                dataloader.outputSize[2]),
                               dtype=np.int32)  # (?, 43, 144)
-
-    # TODO: Faz sentido ter bilinear no train e no valid?
-    # if APPLY_BILINEAR_OUTPUT:
-    #     batch_labelsBilinear = np.zeros((args.batch_size,
-    #                              dataloader.inputSize[1],
-    #                              dataloader.inputSize[2]),
-    #                             dtype=np.int32)  # (?, 172, 576)
-    #
-    #     valid_labelsBilinear_o = np.zeros((len(dataloader.valid_labels),
-    #                                dataloader.inputSize[1],
-    #                                dataloader.inputSize[2]),
-    #                               dtype=np.int32)  # (?, 172, 576)
 
     print("\n[Network/Training] Running built graph...")
     with tf.Session(graph=graph) as session:
@@ -415,7 +404,7 @@ def test(args, params):
     if args.show_test_results:
         test_plotObj = Plot(args.mode, title='Test Predictions')
         for i in range(dataloader.numTestSamples):
-            test_plotObj.showTestResults(test_data_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
+            test_plotObj.showTestResults(test_data_crop_o[i], test_labels_o[i], np.log(test_labels_o[i] + LOSS_LOG_INITIAL_VALUE), predCoarse[i], predFine[i], i)
 
 
 # ======
@@ -425,9 +414,15 @@ def main(args):
     """ This Coarse-to-Fine Network Architecture predicts the log depth (log y)."""
     print("[%s] Running..." % appName)
 
-    modelParams = {'inputSize': -1, 'outputSize': -1, 'model_name': args.model_name,
-                   'learning_rate': args.learning_rate, 'batch_size': args.batch_size,
-                   'max_steps': args.max_steps, 'dropout': args.dropout, 'ldecay': args.ldecay, 'l2norm': args.l2norm,
+    modelParams = {'inputSize': -1,
+                   'outputSize': -1,
+                   'model_name': args.model_name,
+                   'learning_rate': args.learning_rate,
+                   'batch_size': args.batch_size,
+                   'max_steps': args.max_steps,
+                   'dropout': args.dropout,
+                   'ldecay': args.ldecay,
+                   'l2norm': args.l2norm,
                    'full_summary': args.full_summary}
 
     if args.mode == 'train':

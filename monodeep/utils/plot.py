@@ -25,11 +25,12 @@ class Plot(object):
             self.axes[4] = plt.subplot(324)
 
         elif mode == 'test':
-            self.fig, self.axes = plt.subplots(4, 1)
-            self.axes[0] = plt.subplot(221)
-            self.axes[1] = plt.subplot(222)
-            self.axes[2] = plt.subplot(223)
-            self.axes[3] = plt.subplot(224)
+            self.fig, self.axes = plt.subplots(5, 1)
+            self.axes[0] = plt.subplot(321)
+            self.axes[1] = plt.subplot(323)
+            self.axes[2] = plt.subplot(325)
+            self.axes[3] = plt.subplot(322)
+            self.axes[4] = plt.subplot(324)
 
         self.fig.canvas.set_window_title(title)
         self.isFirstTime = True
@@ -88,24 +89,30 @@ class Plot(object):
         plt.pause(0.001)
 
 
-    def showTestResults(self, raw, label, coarse, fine, i):
+    def showTestResults(self, raw, label, log_label,coarse, fine, i):
         plt.figure(1)
 
         # Set Titles and subplots spacing. Runs only at first Time
         if self.isFirstTime:
             self.axes[0].set_title("Raw")
             self.axes[1].set_title("Label")
-            self.axes[2].set_title("Coarse")
-            self.axes[3].set_title("Fine")
+            self.axes[2].set_title("log(Label)")
+            self.axes[3].set_title("Coarse")
+            self.axes[4].set_title("Fine")
             plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
             self.isFirstTime = False
 
         self.fig.canvas.set_window_title("Test Predictions [%d]" % i)
 
         self.axes[0].imshow(raw)
-        self.axes[1].imshow(label)
-        self.axes[2].imshow(coarse)
-        self.axes[3].imshow(fine)
+        cax1 = self.axes[1].imshow(label)
+        # self.fig.colorbar(cax1)
+        cax2 = self.axes[2].imshow(log_label)
+        # self.fig.colorbar(cax2)
+        cax3 = self.axes[3].imshow(coarse)
+        # self.fig.colorbar(cax3)
+        cax4 = self.axes[4].imshow(fine)
+        # self.fig.colorbar(cax4)
 
         plt.pause(0.001)
 

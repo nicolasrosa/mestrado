@@ -318,8 +318,8 @@ class MonodeepModel(object):
             self.tf_valid_predFine = tf.gather_nd(self.tf_predFine, self.tf_idx)
 
             # Select Loss Function:
-            self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_valid_predFine, self.tf_valid_log_labels)  # Default
-            # self.loss_name, self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, self.tf_idx, gamma=0.5) # Internal Mask Out, because of calculation of gradients.
+            # self.loss_name, self.tf_lossF = loss.tf_MSE(self.tf_valid_predFine, self.tf_valid_log_labels)  # Default
+            self.loss_name, self.tf_lossF = loss.tf_L(self.tf_predFine, self.tf_log_labels, self.tf_idx, gamma=0.5) # Internal Mask Out, because of calculation of gradients.
 
             if self.params['l2norm']:
                 self.tf_lossF += loss.calculateL2norm()
