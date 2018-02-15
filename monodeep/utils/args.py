@@ -41,6 +41,9 @@ def argumentHandler():
     parser.add_argument('-t', '--show_train_progress', action='store_true', help="Show Training Progress Images",
                         default=False)
 
+    parser.add_argument('-v', '--show_valid_progress', action='store_true', help="Show Validation Progress Images",
+                        default=False)
+
     parser.add_argument('-te', '--show_train_error_progress', action='store_true',
                         help="Show the first batch label, the correspondent Network predictions and the MSE evaluations.",
                         default=False)

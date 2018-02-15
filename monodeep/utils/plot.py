@@ -61,6 +61,33 @@ class Plot(object):
 
         plt.pause(0.001)
 
+    def showValidResults(self, raw, label, log_label, coarse, fine):
+        plt.figure(2)
+
+        # Set Titles and subplots spacing. Runs only at first Time
+        if self.isFirstTime:
+            self.axes[0].set_title("Raw")
+            self.axes[1].set_title("Label")
+            self.axes[2].set_title("log(Label)")
+            self.axes[3].set_title("Coarse")
+            self.axes[4].set_title("Fine")
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+
+            self.isFirstTime = False
+
+        self.axes[0].imshow(raw)
+        cax1 = self.axes[1].imshow(label)
+        # self.fig.colorbar(cax1)
+        cax2 = self.axes[2].imshow(log_label)
+        # self.fig.colorbar(cax2)
+        cax3 = self.axes[3].imshow(coarse)
+        # self.fig.colorbar(cax3)
+        cax4 = self.axes[4].imshow(fine)
+        # self.fig.colorbar(cax4)
+
+        plt.pause(0.001)
+
+
     def showTestResults(self, raw, label, coarse, fine, i):
         plt.figure(1)
 

@@ -52,7 +52,7 @@ APPLY_BILINEAR_OUTPUT = False
 AVG_SIZE = 20
 MIN_EVALUATIONS = 1000
 MAX_STEPS_AFTER_STABILIZATION = 10000
-
+LOSS_LOG_INITIAL_VALUE = 0.1
 
 # ===========
 #  Functions
@@ -134,11 +134,17 @@ def train(args, params):
                                 dataloader.inputSize[3]),
                                dtype=np.uint8)  # (?, 172, 576, 3)
 
-    valid_dataset_o = np.zeros((len(dataloader.valid_dataset),
+    valid_data_o = np.zeros((len(dataloader.valid_dataset),
                                 dataloader.inputSize[1],
                                 dataloader.inputSize[2],
                                 dataloader.inputSize[3]),
-                               dtype=np.uint8)  # (?, 172, 576, 3)
+                               dtype=np.float64)  # (?, 172, 576, 3) # FIXME: Nao deveria ser uint8 para cada canal?
+
+    valid_data_crop_o = np.zeros((len(dataloader.valid_dataset),
+                             dataloader.inputSize[1],
+                             dataloader.inputSize[2],
+                             dataloader.inputSize[3]),
+                            dtype=np.uint8)  # (?, 172, 576, 3)
 
     batch_labels = np.zeros((args.batch_size,
                              dataloader.outputSize[1],
@@ -179,14 +185,18 @@ def train(args, params):
         if args.show_train_progress:
             train_plotObj = Plot(args.mode, title='Train Predictions')
 
+        if args.show_valid_progress:
+            valid_plotObj = Plot(args.mode, title='Validation Prediction')
+
         for i in range((len(dataloader.valid_dataset))):
-            image, depth, _, _ = dataloader.readImage(dataloader.valid_dataset[i],
+            image, depth, image_crop, _ = dataloader.readImage(dataloader.valid_dataset[i],
                                                       dataloader.valid_labels[i],
                                                       mode='valid',
                                                       showImages=False)
 
-            valid_dataset_o[i] = image
+            valid_data_o[i] = image
             valid_labels_o[i] = depth
+            valid_data_crop_o[i] = image_crop
 
         for step in range(args.max_steps):
             start2 = time.time()
@@ -216,7 +226,7 @@ def train(args, params):
             feed_dict_train = {model.tf_image: batch_data, model.tf_labels: batch_labels,
                                model.tf_keep_prob: args.dropout}
 
-            feed_dict_valid = {model.tf_image: valid_dataset_o, model.tf_labels: valid_labels_o,
+            feed_dict_valid = {model.tf_image: valid_data_o, model.tf_labels: valid_labels_o,
                                model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
@@ -269,6 +279,9 @@ def train(args, params):
                                                    coarse=train_PredCoarse[0, :, :], fine=train_PredFine[0, :, :],
                                                    figId=8)
 
+                if args.show_valid_progress:
+                    valid_plotObj.showValidResults(raw=valid_data_crop_o[0, :, :, :], label=valid_labels_o[0], log_label=np.log(valid_labels_o[0]+LOSS_LOG_INITIAL_VALUE),coarse=valid_PredCoarse[0], fine=valid_PredFine[0])
+
                 end2 = time.time()
                 print('step: {0:d}/{1:d} | t: {2:f} | Batch trLoss: {3:>16.4f} | vLoss: {4:>16.4f} '.format(step,
                                                                                                             args.max_steps,
@@ -320,11 +333,11 @@ def test(args, params):
     test_labels_o = np.zeros((len(dataloader.test_dataset), dataloader.outputSize[1], dataloader.outputSize[2]),
                              dtype=np.int32)  # (?, 43, 144)
 
-    test_dataset_o = np.zeros(
+    test_data_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
         dtype=np.uint8)  # (?, 172, 576, 3)
 
-    test_dataset_crop_o = np.zeros(
+    test_data_crop_o = np.zeros(
         (len(dataloader.test_dataset), dataloader.inputSize[1], dataloader.inputSize[2], dataloader.inputSize[3]),
         dtype=np.uint8)  # (?, 172, 576, 3)
 
@@ -356,8 +369,8 @@ def test(args, params):
         else:
             image, _, image_crop, _ = dataloader.readImage(dataloader.test_dataset[i], None, mode='test')
 
-        test_dataset_o[i] = image
-        test_dataset_crop_o[i] = image_crop
+        test_data_o[i] = image
+        test_data_crop_o[i] = image_crop
 
         if APPLY_BILINEAR_OUTPUT:
             predCoarse[i], predFine[i], predCoarseBilinear[i], predFineBilinear[i] = model.networkPredict(image,
@@ -402,7 +415,7 @@ def test(args, params):
     if args.show_test_results:
         test_plotObj = Plot(args.mode, title='Test Predictions')
         for i in range(dataloader.numTestSamples):
-            test_plotObj.showTestResults(test_dataset_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
+            test_plotObj.showTestResults(test_data_crop_o[i], test_labels_o[i], predCoarse[i], predFine[i], i)
 
 
 # ======
