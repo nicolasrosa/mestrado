@@ -69,7 +69,9 @@ def selectedDataset(DATASET_PATH_ROOT, dataset):
             dataset_path = DATASET_PATH_ROOT + 'nicolas_kitti/dataset1/campus/2011_09_28_drive_0039'
 
         elif dataset == 'kittiraw_residential_continuous':
-            dataset_path = DATASET_PATH_ROOT + 'nicolas_kitti/dataset1/residential_continuous'
+            # dataset_path = DATASET_PATH_ROOT + 'nicolas_kitti/dataset1/residential_continuous'                # Load from HD
+            dataset_path ='/home/olorin/Documents/nicolas/tensorflow/tese/monodeep/data/residential_continuous' # Load from SSD
+
 
         # print(dataset_path)
         # input()
@@ -397,14 +399,6 @@ class MonodeepDataloader(object):
         train_valid_pairs_idx = getValidPairFiles(train_files_colors_filename, train_files_depth_filename,
                                                   self.datasetObj)
 
-        # Original Images
-        # test_colors_crop, test_depth_crop = [], []
-        # train_colors_crop, train_depth_crop = [], []
-
-        # Processed Images for Network Training
-        # test_dataset, test_labels = [], []
-        # train_dataset, train_labels = [], []
-
         """Testing"""
         test_colors_filepath, test_depth_filepath = [], []
         if len(test_valid_pairs_idx):  # Some test data doesn't have depth images
@@ -461,54 +455,6 @@ class MonodeepDataloader(object):
         self.numTrainSamples = len(self.train_dataset)
         self.numTestSamples = len(self.test_dataset)
 
-        # ################################
-        # input_queue = tf.train.string_input_producer(['kitti_train_filenames.txt'], shuffle=False)
-        # line_reader = tf.TextLineReader()
-        # _, line = line_reader.read(input_queue)
-        # split_line = tf.string_split([line]).values
-        #
-        # # we load only one image for test, except if we trained a stereo model
-        # a = imread(self.train_dataset[0])
-        # imshow(a)
-        # input("oi")
-        #
-        # image_path = split_line[0]
-        # image_o = self.read_image(image_path)
-        # depth_path = split_line[1]
-        # depth_o = self.read_image(depth_path)
-        #
-        # print(input_queue)
-        # print(line_reader)
-        # print(line)
-        # print(split_line)
-        # print(image_path)
-        # print(len(image_path))
-        # input("Continue3...")
-        #
-        # if mode == 'train':
-        #     # randomly flip images
-        #     do_flip = tf.random_uniform([], 0, 1)
-        #     image = tf.cond(do_flip > 0.5, lambda: tf.image.flip_left_right(right_image_o), lambda: image_o)
-        #
-        #     sess = tf.Session()
-        #     # print(do_flip.eval(session=sess))
-        #     input("Continue2...")
-        #
-        #     # randomly augment images
-        #     do_augment  = tf.random_uniform([], 0, 1)
-        #     image = tf.cond(do_augment > 0.5, lambda: self.augment_image_pair(image), lambda: (image))
-        #
-        #     image.set_shape( [None, None, 3])
-        #
-        #     # capacity = min_after_dequeue + (num_threads + a small safety margin) * batch_size
-        #     min_after_dequeue = 2048
-        #     capacity = min_after_dequeue + 4 * params.batch_size
-        #     self.image_batch = tf.train.shuffle_batch([image],
-        #                                               params.batch_size, capacity, min_after_dequeue, params.num_threads)
-        #
-        # elif mode == 'test':
-        #     self.image_batch = tf.stack([image_o, tf.image.flip_left_right(image_o)], 0)
-        #     self.image_batch.set_shape([2, None, None, 3])
 
     def readImage(self, colors_path, depth_path, mode, showImages=False):
         # The DataAugmentation Transforms should be done before the Image Normalization!!!

@@ -8,6 +8,12 @@
 # TODO: Validar Métricas.
 # TODO: Adicionar mais topologias
 # TODO: If detect Ctrl+C, save training state.
+# TODO: Vitor sugeriu substituir a parte fully connected da rede por filtros deconvolucionais, deste modo pode-se fazer uma predicao recuperando o tamanho da imagem alem de ter muito menos parametros treinaveis na rede.
+
+# TODO: Implementar leitura das imagens pelo Tensorflow - Treinamento
+# TODO: Implementar leitura das imagens pelo Tensorflow - Validação
+# TODO: Implementar leitura das imagens pelo Tensorflow - Treinamento
+
 
 # Known Bugs
 # Leitura e Processamento das Imagens estão sendo feitos na CPU
@@ -19,6 +25,7 @@ import os
 import sys
 import time
 import warnings
+import random
 from collections import deque
 
 import numpy as np
@@ -26,9 +33,12 @@ import numpy as np
 #  Libraries
 # ===========
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from scipy import misc as scp
 
 import utils.args as args
 import utils.metrics as metrics
+
 from utils.importNetwork import ImportGraph
 from utils.monodeep_dataloader import MonodeepDataloader
 from utils.monodeep_model import MonodeepModel
@@ -407,6 +417,104 @@ def test(args, params):
             test_plotObj.showTestResults(test_data_crop_o[i], test_labels_o[i], np.log(test_labels_o[i] + LOSS_LOG_INITIAL_VALUE), predCoarse[i], predFine[i], i)
 
 
+def tf_readImage():
+    # ATTENTION! Since these tensors operate on a FifoQueue, using .eval() may misalign the pair (image, depth)!!
+
+    # KittiRaw Residential Continous
+    # Image: (375, 1242, 3) uint8
+    # Depth: (375, 1242)    uint8
+
+    # Local Variables
+    numSteps = 4
+
+    h, w = 375, 1242
+    r_w, r_h = 640, 480
+    seed = random.randint(0, 2 ** 31 - 1)
+
+    # FIXME: Kitti Original as imagens de disparidade sao do tipo int32, no caso do kittiraw_residential_continous sao uint8
+
+    # Searches dataset images filenames and create queue objects
+    tf_train_image_filename_list = tf.train.match_filenames_once("data/residential_continuous/training/imgs/*.png")
+    tf_train_depth_filename_list = tf.train.match_filenames_once("data/residential_continuous/training/dispc/*.png")
+
+    train_image_filename_queue = tf.train.string_input_producer(tf_train_image_filename_list, shuffle=False, seed=1)
+    train_depth_filename_queue = tf.train.string_input_producer(tf_train_depth_filename_list, shuffle=False, seed=1)
+
+    # Reads images
+    image_reader = tf.WholeFileReader()
+    tf_image_key, image_file = image_reader.read(train_image_filename_queue)
+    tf_depth_key, depth_file = image_reader.read(train_depth_filename_queue)
+
+    tf_images = tf.image.decode_png(image_file)
+    tf_depths = tf.image.decode_png(depth_file)
+
+    # Restores images structure (size, type)
+    tf_images_resized = tf.cast(tf_images, tf.uint8)
+    tf_depths_resized = tf.cast(tf_depths, tf.uint8)
+    tf_images_resized.set_shape((h, w, 3))
+    tf_depths_resized.set_shape((h, w, 1))
+
+    tf_depths_resized = tf.squeeze(tf_depths_resized, axis=2)
+
+    tf_batch_data, tf_batch_labels = tf.train.shuffle_batch(
+        # [tf_image_key, tf_depth_key],           # Enable for Debugging the filename strings.
+        [tf_images_resized, tf_depths_resized], # Enable for debugging images
+        batch_size=7,
+        num_threads=1,
+        capacity=384, # TODO: Que valor devo colocar? Antes estava igual a 3
+        min_after_dequeue=0)
+
+    print(tf_batch_data)
+    print(tf_batch_labels)
+
+    with tf.Session() as sess:
+        tf.global_variables_initializer().run()
+        tf.local_variables_initializer().run()
+
+        # Check Dataset Integrity
+        train_image_filename_list, train_depth_filename_list = sess.run([tf_train_image_filename_list, tf_train_depth_filename_list])
+        train_image_filename_list = [item[-53:] for item in train_image_filename_list]
+        train_depth_filename_list = [item[-53:] for item in train_depth_filename_list]
+
+        print("[monodeep/Dataset] Checking if RGB and Depth images are paired... ")
+        if train_image_filename_list == train_depth_filename_list:
+            print("[monodeep/Dataset] Check Integrity: Pass")
+            del train_image_filename_list, train_depth_filename_list
+        else:
+            print("[monodeep/Dataset] Check Integrity: Failed")
+            raise SystemExit
+
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+
+        for i in range(numSteps):
+            batch_data, batch_labels = sess.run([tf_batch_data, tf_batch_labels])
+            # image_key, depth_key = sess.run([tf_image_key, tf_depth_key])
+
+            def debug():
+                # print()
+                # print(image_key)
+                # print()
+                # print(depth_key)
+                # print()
+                # print(batch_data)
+                # print()
+                # print(batch_labels)
+
+                plt.figure(1)
+                plt.imshow(batch_data[i])
+                plt.figure(2)
+                plt.imshow(batch_labels[i])
+                plt.pause(0.5)
+
+                input("enter")
+
+            debug()
+
+        coord.request_stop()
+        coord.join(threads)
+
+
 # ======
 #  Main
 # ======
@@ -424,6 +532,9 @@ def main(args):
                    'ldecay': args.ldecay,
                    'l2norm': args.l2norm,
                    'full_summary': args.full_summary}
+
+    tf_readImage() # TODO: Remover
+    input("tf_readImage")
 
     if args.mode == 'train':
         train(args, modelParams)
