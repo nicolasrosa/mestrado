@@ -7,7 +7,6 @@ import argparse
 # ===========
 #  Functions
 # ===========
-
 def argumentHandler():
     # Creating Arguments Parser
     parser = argparse.ArgumentParser("Train the Bitnet Tensorflow implementation taking the dataset.pkl file as input.")
@@ -53,5 +52,14 @@ def argumentHandler():
                         default='output/')
 
     parser.add_argument('-u', '--show_test_results', action='store_true', help="Show the first batch testing Network prediction img", default=False)
+
+    return parser.parse_args()
+
+def argumentHandler_original():
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gpu', type=str, help="Select which gpu to run the code", default='0')
+    parser.add_argument('model_path', help='Converted parameters for the model')
+    parser.add_argument('image_paths', help='Directory of images to predict')
 
     return parser.parse_args()

@@ -21,20 +21,20 @@
 # Data Augmentation - Brightness not working
 # SAVE_TEST_DISPARITIES - Funciona, mas nao uso propriamente
 
+# ===========
+#  Libraries
+# ===========
 import os
 import sys
 import time
 import warnings
 import random
-from collections import deque
-
 import numpy as np
-# ===========
-#  Libraries
-# ===========
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from scipy import misc as scp
+from scipy.misc as scp
+
+from collections import deque
 
 import utils.args as args
 import utils.metrics as metrics
@@ -65,9 +65,11 @@ MIN_EVALUATIONS = 1000
 MAX_STEPS_AFTER_STABILIZATION = 10000
 LOSS_LOG_INITIAL_VALUE = 0.1
 
+
 # ===========
 #  Functions
 # ===========
+# TODO: Move
 def createSaveFolder():
     save_path = None
     save_restore_path = None
@@ -98,16 +100,20 @@ def train(args, params):
 
     save_path, save_restore_path = createSaveFolder()
 
+    tf_readImage(args)  # TODO: Remover
+    input("tf_readImage")
+
     # -----------------------------------------
     #  Network Training Model - Building Graph
     # -----------------------------------------
     graph = tf.Graph()
     with graph.as_default():
-        # MonoDeep
+        # Load Dataset
         dataloader = MonodeepDataloader(args.data_path, params, args.dataset, args.mode)
         params['inputSize'] = dataloader.inputSize
         params['outputSize'] = dataloader.outputSize
 
+        # MonoDeep
         model = MonodeepModel(args.mode, params)
 
         def test_dataAug():
@@ -145,11 +151,16 @@ def train(args, params):
                                 dataloader.inputSize[3]),
                                dtype=np.uint8)  # (?, 172, 576, 3)
 
+    batch_labels = np.zeros((args.batch_size,
+                             dataloader.outputSize[1],
+                             dataloader.outputSize[2]),
+                            dtype=np.int32)  # (?, 43, 144)
+
     valid_data_o = np.zeros((len(dataloader.valid_dataset),
-                                dataloader.inputSize[1],
-                                dataloader.inputSize[2],
-                                dataloader.inputSize[3]),
-                               dtype=np.float64)  # (?, 172, 576, 3) # FIXME: Nao deveria ser uint8 para cada canal?
+                             dataloader.inputSize[1],
+                             dataloader.inputSize[2],
+                             dataloader.inputSize[3]),
+                            dtype=np.float64)  # (?, 172, 576, 3) # FIXME: Nao deveria ser uint8 para cada canal?
 
     valid_data_crop_o = np.zeros((len(dataloader.valid_dataset),
                              dataloader.inputSize[1],
@@ -157,18 +168,13 @@ def train(args, params):
                              dataloader.inputSize[3]),
                             dtype=np.uint8)  # (?, 172, 576, 3)
 
-    batch_labels = np.zeros((args.batch_size,
-                             dataloader.outputSize[1],
-                             dataloader.outputSize[2]),
-                            dtype=np.int32)  # (?, 43, 144)
-
     valid_labels_o = np.zeros((len(dataloader.valid_labels),
                                dataloader.outputSize[1],
                                dataloader.outputSize[2]),
                               dtype=np.int32)  # (?, 43, 144)
 
     print("\n[Network/Training] Running built graph...")
-    with tf.Session(graph=graph) as session:
+    with tf.Session(graph=graph) as sess:
         tf.global_variables_initializer().run()
 
         print("[Network/Training] Training Initialized!\n")
@@ -229,10 +235,10 @@ def train(args, params):
                                model.tf_keep_prob: 1.0}
 
             # ----- Session Run! ----- #
-            _, log_labels, train_PredCoarse, train_PredFine, train_lossF, summary_str = session.run(
+            _, log_labels, train_PredCoarse, train_PredFine, train_lossF, summary_str = sess.run(
                 [model.train, model.tf_log_labels, model.tf_predCoarse, model.tf_predFine, model.tf_lossF,
                  summary_op], feed_dict=feed_dict_train)  # Training
-            valid_PredCoarse, valid_PredFine, valid_lossF = session.run(
+            valid_PredCoarse, valid_PredFine, valid_lossF = sess.run(
                 [model.tf_predCoarse, model.tf_predFine, model.tf_lossF], feed_dict=feed_dict_valid)  # Validation
             # -----
 
@@ -296,12 +302,12 @@ def train(args, params):
         #  Save Results
         # ==============
         if SAVE_TRAINED_MODEL:
-            model.saveTrainedModel(save_restore_path, session, train_saver, args.model_name)
+            model.saveTrainedModel(save_restore_path, sess, train_saver, args.model_name)
 
         # Logs the obtained test result
         f = open('results.txt', 'a')
         f.write("%s\t\t%s\t\t%s\t\t%s\t\tsteps: %d\ttrain_lossF: %f\tvalid_lossF: %f\t%f\n" % (
-            datetime, args.model_name, args.dataset, model.loss_name,  step, train_lossF,
+            datetime, args.model_name, args.dataset, model.loss_name, step, train_lossF,
             valid_lossF, sim_train))
         f.close()
 
@@ -417,7 +423,7 @@ def test(args, params):
             test_plotObj.showTestResults(test_data_crop_o[i], test_labels_o[i], np.log(test_labels_o[i] + LOSS_LOG_INITIAL_VALUE), predCoarse[i], predFine[i], i)
 
 
-def tf_readImage():
+def tf_readImage(args):
     # ATTENTION! Since these tensors operate on a FifoQueue, using .eval() may misalign the pair (image, depth)!!
 
     # KittiRaw Residential Continous
@@ -456,13 +462,38 @@ def tf_readImage():
 
     tf_depths_resized = tf.squeeze(tf_depths_resized, axis=2)
 
+
+    # Normalizes Images
+    # pixel_depth = 255
+    # mean = tf.constant(pixel_depth/2, dtype=tf.float32)
+    # print(mean)
+    # tf_images_resized = (tf.cast(tf_images_resized,dtype=tf.float32) - mean)/pixel_depth
+    tf_images_resized = tf.image.per_image_standardization(tf_images_resized) # TODO: melhor do que (img - 127,5)/255?
+
     tf_batch_data, tf_batch_labels = tf.train.shuffle_batch(
         # [tf_image_key, tf_depth_key],           # Enable for Debugging the filename strings.
-        [tf_images_resized, tf_depths_resized], # Enable for debugging images
-        batch_size=7,
+        [tf_images_resized, tf_depths_resized],  # Enable for debugging images
+        batch_size=args.batch_size,
         num_threads=1,
-        capacity=384, # TODO: Que valor devo colocar? Antes estava igual a 3
+        capacity=384,  # TODO: Que valor devo colocar? Antes estava igual a 3
         min_after_dequeue=0)
+
+    # Data Augmentation
+    # TODO: Crop
+    # cropSize = [172, 576]
+    # x_min = round((h - cropSize[0]) / 2)
+    # x_max = round((h + cropSize[0]) / 2)
+    # y_min = round((w - cropSize[1]) / 2)
+    # y_max = round((w + cropSize[1]) / 2)
+    #
+    # patches_top = [0, 0.5]
+    # patches_bottom = [0.25, 0.75]
+    # boxes = tf.stack([patches_top, patches_top, patches_bottom, patches_bottom], axis=1)
+    #
+    # tf_batch_data = tf.cast(tf.image.crop_and_resize(tf_batch_data, boxes,
+    #                                              box_ind=tf.zeros_like(patches_top, dtype=tf.int32),
+    #                                              crop_size=cropSize, method="bilinear", extrapolation_value=None,
+    #                                              name="generate_resized_crop"),dtype=tf.uint8)
 
     print(tf_batch_data)
     print(tf_batch_labels)
@@ -533,8 +564,8 @@ def main(args):
                    'l2norm': args.l2norm,
                    'full_summary': args.full_summary}
 
-    tf_readImage() # TODO: Remover
-    input("tf_readImage")
+    # Predict the image
+    # pred = predict(args.model_path, args.image_paths)
 
     if args.mode == 'train':
         train(args, modelParams)

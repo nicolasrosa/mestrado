@@ -1,0 +1,52 @@
+2018-01-27_16-02-19		monodeep		kitti2012		steps: 9	train_lossF: 748.101562	valid_lossF: 4542.795410
+2018-01-27_16-05-00		monodeep		kitti2012		steps: 9	train_lossF: 770.144897	valid_lossF: 4550.460449
+2018-01-27_16-05-27		monodeep		kitti2012		steps: 99	train_lossF: 71.911995	valid_lossF: 4224.634766
+2018-01-27_16-08-20		monodeep		kitti2012		steps: 999	train_lossF: 81.168480	valid_lossF: 2992.892578
+2018-01-27_17-53-29		monodeep		kitti2012		steps: 99999	train_lossF: 1.615592	valid_lossF: 435.404785
+2018-01-30_12-51-23		monodeep		kitti2012		steps: 9	train_lossF: 612.351379	valid_lossF: 4494.393555
+2018-01-30_12-55-11		monodeep		kitti2012		steps: 9	train_lossF: 680.883423	valid_lossF: 4515.207031
+2018-01-30_13-01-54		monodeep		nyudepth		steps: 99	train_lossF: 109.251396	valid_lossF: 242272.343750
+2018-01-31_11-00-59		monodeep		kitti2012		steps: 99	train_lossF: 540.451172	valid_lossF: 15597.198242
+2018-01-31_11-25-04		monodeep		kitti2012		steps: 99	train_lossF: 561.189453	valid_lossF: 15414.755859
+2018-01-31_11-46-34		monodeep		kitti2012		steps: 1999	train_lossF: 536.267517	valid_lossF: 10422.070312
+2018-01-31_13-10-07		monodeep		kitti2012		steps: 9	train_lossF: 3112.025146	valid_lossF: 16398.666016
+2018-01-31_13-16-14		monodeep		kitti2012		steps: 9	train_lossF: 2995.163818	valid_lossF: 16368.290039
+2018-01-31_13-43-37		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 759.266724	valid_lossF: 22158.183594
+2018-01-31_13-49-11		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 825.245667	valid_lossF: 22258.193359
+2018-02-01_16-43-19		monodeep		nyudepth		steps: 9	train_lossF: 9253.974609	valid_lossF: 827007.500000
+2018-02-01_16-44-00		monodeep		nyudepth		steps: 9	train_lossF: 9072.799805	valid_lossF: 825859.125000
+2018-02-01_17-01-44		monodeep		nyudepth		steps: 9	train_lossF: 9009.640625	valid_lossF: 825489.000000
+2018-02-01_17-09-16		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 213.311478	valid_lossF: 1087.704590
+2018-02-01_17-13-30		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 210.090317	valid_lossF: 1086.695312
+2018-02-01_18-43-22		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 832.850952	valid_lossF: 22254.980469
+2018-02-01_19-12-43		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 781.323242	valid_lossF: 21877.390625
+2018-02-01_19-40-49		monodeep		kittiraw_residential_continuous		steps: 29	train_lossF: 155.679169	valid_lossF: 21244.480469
+2018-02-01_19-47-41		monodeep		kittiraw_residential_continuous		steps: 29	train_lossF: 139.801575	valid_lossF: 21127.960938
+2018-02-01_21-50-19		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 797.685486	valid_lossF: 21877.949219
+2018-02-02_09-58-30		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 777.441162	valid_lossF: 21851.316406
+2018-02-02_09-58-57		monodeep		kittiraw_residential_continuous		steps: 99	train_lossF: 51.230003	valid_lossF: 20831.429688
+2018-02-02_11-26-12		monodeep		kitti2012		steps: 99	train_lossF: 21.407217	valid_lossF: 32.622520
+2018-02-02_13-49-42		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 13.284285	valid_lossF: 14.129333
+2018-02-02_16-05-03		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 13.106489	valid_lossF: 14.112410
+2018-02-02_18-17-18		monodeep		kitti2012		steps: 9	train_lossF: 42.678265	valid_lossF: 43.609993
+2018-02-02_18-17-47		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 13.220327	valid_lossF: 14.120155
+2018-02-02_18-18-14		monodeep		kittiraw_residential_continuous		steps: 99	train_lossF: 2.022327	valid_lossF: 13.501406
+2018-02-02_18-21-02		monodeep		kittiraw_residential_continuous		steps: 999	train_lossF: 2.125216	valid_lossF: 10.427030
+2018-02-02_18-47-52		monodeep		kittiraw_residential_continuous		steps: 9999	train_lossF: 0.218493	valid_lossF: 5.786414
+2018-02-02_23-14-30		monodeep		kittiraw_residential_continuous		steps: 99999	train_lossF: 0.012559	valid_lossF: 3.596559
+2018-02-09_11-35-32		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.268959	valid_lossF: 16.564203	33.113546
+2018-02-09_11-45-13		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.130072	valid_lossF: 16.552511	29.524871
+2018-02-09_12-06-24		monodeep		kittiraw_residential_continuous		steps: 999	train_lossF: 0.102615	valid_lossF: 11.663867	2173.047358
+2018-02-09_15-21-56		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.273966	valid_lossF: 16.559946	31.646292
+2018-02-09_15-29-04		monodeep		nyudepth		steps: 9	train_lossF: 32.160957	valid_lossF: 32.491371	36.081109
+2018-02-09_15-29-55		monodeep		nyudepth		steps: 99	train_lossF: 1.961702	valid_lossF: 24.244419	179.453494
+2018-02-10_12-14-23		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.553789	valid_lossF: 13.780991	46.387318
+2018-02-10_14-39-49		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.517317	valid_lossF: 13.775550	46.346340
+2018-02-10_14-57-02		monodeep		kittiraw_residential_continuous		steps: 9999	train_lossF: 0.192634	valid_lossF: 8.446130	15984.765011
+2018-02-10_21-08-04		monodeep		kittiraw_residential_continuous		steps: 9	train_lossF: 16.513126	valid_lossF: 13.776248	37.411404
+2018-02-10_22-03-11		monodeep		kittiraw_residential_continuous		steps: 29	train_lossF: 6.866468	valid_lossF: 11.749200	76.598865
+2018-02-10_22-06-57		monodeep		kittiraw_residential_continuous		steps: 0	train_lossF: 14.961056	valid_lossF: 12.392735	23.472377
+2018-02-10_22-43-53		monodeep		kittiraw_residential_continuous		steps: 9999	train_lossF: 0.620706	valid_lossF: 0.527761	16284.025526
+2018-02-14_19-49-06		monodeep		kittiraw_residential_continuous	Eigen's Log Depth		steps: 9	train_lossF: 8.915350	valid_lossF: 8.536131	27.481364
+2018-02-14_19-50-14		monodeep		kittiraw_residential_continuous	MSE		steps: 9	train_lossF: 16.202875	valid_lossF: 16.564497	30.320708
+2018-02-14_22-13-28		monodeep		kittiraw_residential_continuous		MSE		steps: 19999	train_lossF: 0.043697	valid_lossF: 0.257409	35650.539034

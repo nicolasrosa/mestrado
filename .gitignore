@@ -1,0 +1,6 @@
+monodeep/.idea/*
+monodeep/data/*
+monodeep/output/*
+monodeep/temp/*
+*.pyc
+*.DS_Store
